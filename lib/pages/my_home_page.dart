@@ -4,6 +4,7 @@ import '../providers/auth_model.dart';
 import '../providers/app_state.dart';
 import 'login_page.dart';
 import 'package:projeto_estoque/consumer_api.dart';
+import 'aparato_detalhes_page.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
@@ -180,20 +181,22 @@ class MyHomePageState extends State<MyHomePage> {
                               child: ListTile(
                                 contentPadding: const EdgeInsets.all(16.0),
                                 title: Text(
-                                  item['nomeCategoria'] ?? 'Sem Nome',
+                                  item['equipamento'] ?? 'Sem nome',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 20.0,
+                                    fontSize: 16.0,
                                     color: Colors.black,
                                   ),
                                 ),
-                                subtitle: Text(
-                                  'Quantidade: ${item['quantidadeCategoria'] ?? 'N/A'}',
-                                  style: const TextStyle(
-                                    fontSize: 16.0,
-                                    color: Colors.grey, 
-                                  ),
-                                ),
+                                subtitle: Text('Quantidade: ${item['quantidade'] ?? 0}'),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => AparatoDetalhesPage(aparato: item),
+                                    ),
+                                  );
+                                },
                               ),
                             );
                           },

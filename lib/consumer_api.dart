@@ -18,28 +18,22 @@ class AuthManager {
 }
 
 Future<List<Map<String, dynamic>>> fetchDados(String pesquisa) async {
-  const url = 'http://192.168.2.55:80/estoque';
   final client = http.Client();
 
   try {
-    final response = await client.get(Uri.parse(url), headers: {
-      'Connection': 'keep-alive',
-      'Keep-Alive': 'timeout=30'
-    }).timeout(const Duration(seconds: 30));
+    // URL da rota para acessar a tabela aparatos
+    final response = await client.get(
+      Uri.parse('http://192.168.2.112:3000/aparatos?pesquisa=$pesquisa'),
+    ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
       final jsonData = jsonDecode(response.body) as List<dynamic>;
-
-      final categorias = jsonData.where((item) {
-        final nomeCategoria = item['nomeCategoria'] as String;
-        return nomeCategoria.toLowerCase().contains(pesquisa.toLowerCase());
-      }).toList().cast<Map<String, dynamic>>();
-
-      return categorias;
+      return jsonData.cast<Map<String, dynamic>>();
     } else {
       return [];
     }
   } catch (e) {
+    print('Erro na requisição: $e');
     return [];
   } finally {
     client.close();
