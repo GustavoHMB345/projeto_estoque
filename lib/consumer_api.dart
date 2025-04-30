@@ -23,7 +23,51 @@ Future<List<Map<String, dynamic>>> fetchDados(String pesquisa) async {
   try {
     // URL da rota para acessar a tabela aparatos
     final response = await client.get(
-      Uri.parse('http://192.168.2.112:3000/aparatos?pesquisa=$pesquisa'),
+      Uri.parse('http://192.168.2.112:3000/produtos'),
+    ).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 200) {
+      final jsonData = jsonDecode(response.body) as List<dynamic>;
+      return jsonData.cast<Map<String, dynamic>>();
+    } else {
+      return [];
+    }
+  } catch (e) {
+    print('Erro na requisição: $e');
+    return [];
+  } finally {
+    client.close();
+  }
+}
+
+Future<List<Map<String, dynamic>>> fetchCategorias() async {
+  final client = http.Client();
+
+  try {
+    final response = await client.get(
+      Uri.parse('http://192.168.2.112:3000/categorias'),
+    ).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 200) {
+      final jsonData = jsonDecode(response.body) as List<dynamic>;
+      return jsonData.cast<Map<String, dynamic>>();
+    } else {
+      return [];
+    }
+  } catch (e) {
+    print('Erro na requisição: $e');
+    return [];
+  } finally {
+    client.close();
+  }
+}
+
+Future<List<Map<String, dynamic>>> fetchMovimentacoesEstoque() async {
+  final client = http.Client();
+
+  try {
+    final response = await client.get(
+      Uri.parse('http://192.168.2.112:3000/movimentacoes_estoque'),
     ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {

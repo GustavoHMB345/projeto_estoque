@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 class AppState with ChangeNotifier {
-  String _headerText = 'Cabeçalho do Drawer';
+  String _headerText = 'Drawer';
   MainAxisAlignment _mainAxisAlignment = MainAxisAlignment.spaceBetween;
+  bool _isLoggedIn = false;
 
   String get headerText => _headerText;
   MainAxisAlignment get mainAxisAlignment => _mainAxisAlignment;
+  bool get isLoggedIn => _isLoggedIn;
 
   void updateHeaderText(String newText) {
     _headerText = newText;
@@ -16,4 +18,14 @@ class AppState with ChangeNotifier {
     _mainAxisAlignment = newMainAxisAlignment;
     notifyListeners();
   }
-} 
+
+  void login() {
+    _isLoggedIn = true;
+    notifyListeners();
+  }
+
+  void logout() {
+    _isLoggedIn = false;
+    notifyListeners();
+  }
+}
