@@ -5,7 +5,6 @@ class Produto {
   final String condicao;
   final String unidade;
   final int quantidade;
-  final double precoUnitario;
   final DateTime criadoEm;
 
   Produto({
@@ -15,20 +14,18 @@ class Produto {
     required this.condicao,
     required this.unidade,
     required this.quantidade,
-    required this.precoUnitario,
     required this.criadoEm,
   });
 
   factory Produto.fromJson(Map<String, dynamic> json) {
     return Produto(
-      id: json['id'].toString(), // Garantindo que o ID seja tratado como String
+      id: json['id'].toString(),
       nome: json['nome'] ?? '',
-      categoriaId: json['categoria_id'].toString(), // Garantindo que o ID da categoria seja tratado como String
+      categoriaId: json['categoria_id'].toString(),
       condicao: json['condicao'] ?? '',
       unidade: json['unidade'] ?? '',
-      quantidade: int.tryParse(json['quantidade'].toString()) ?? 0, // Garantindo que a quantidade seja tratada como int
-      precoUnitario: double.tryParse(json['preco_unitario'].toString()) ?? 0.0, // Garantindo que o preço unitário seja tratado como double
-      criadoEm: DateTime.parse(json['criado_em'] ?? DateTime.now().toIso8601String()),
+      quantidade: json['quantidade'] != null ? int.tryParse(json['quantidade'].toString()) ?? 0 : 0,
+      criadoEm: json['criado_em'] != null ? DateTime.parse(json['criado_em']) : DateTime.now(),
     );
   }
 
@@ -40,7 +37,6 @@ class Produto {
       'condicao': condicao,
       'unidade': unidade,
       'quantidade': quantidade,
-      'preco_unitario': precoUnitario,
       'criado_em': criadoEm.toIso8601String(),
     };
   }

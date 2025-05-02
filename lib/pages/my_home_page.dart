@@ -71,7 +71,12 @@ class MyHomePageState extends State<MyHomePage> {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   } else if (snapshot.hasError) {
-                    return const Center(child: Text('Erro ao carregar produtos'));
+                    return Center(
+                      child: Text(
+                        'Erro ao carregar produtos: ${snapshot.error}',
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    );
                   } else if (snapshot.hasData) {
                     final produtos = snapshot.data?.map((json) => Produto.fromJson(json)).toList() ?? [];
                     return produtos.isEmpty
@@ -93,8 +98,10 @@ class MyHomePageState extends State<MyHomePage> {
                                       Text('Condição: ${produto.condicao}'),
                                       Text('Unidade: ${produto.unidade}'),
                                       Text('Quantidade: ${produto.quantidade}'),
-                                      Text('Preço Unitário: R\$ ${produto.precoUnitario.toStringAsFixed(2)}'),
-                                      Text('Criado em: ${produto.criadoEm.toLocal()}'),
+                                      Text('Criado em: '
+                                          '${produto.criadoEm.toLocal().day.toString().padLeft(2, '0')}-'
+                                          '${produto.criadoEm.toLocal().month.toString().padLeft(2, '0')}-'
+                                          '${produto.criadoEm.toLocal().year.toString().substring(2)}'),
                                     ],
                                   ),
                                   onTap: () {
