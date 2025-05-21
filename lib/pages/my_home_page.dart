@@ -7,9 +7,8 @@ import '../providers/app_state.dart';
 import '../consumer_api.dart';
 import '../models/categoria.dart';
 import '../models/produto.dart';
-import '../models/movimentacao_estoque.dart';
+import 'package:logging/logging.dart';
 
-// Definição do widget principal da página inicial
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
 
@@ -17,13 +16,12 @@ class MyHomePage extends StatefulWidget {
   MyHomePageState createState() => MyHomePageState();
 }
 
-// Estado associado ao widget MyHomePage
 class MyHomePageState extends State<MyHomePage> {
-  // Controladores de texto e chaves para gerenciar estado e entradas
   final _textController = TextEditingController();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   late AppState _appState;
+  final _logger = Logger('MyHomePage');
 
   @override
   void initState() {
@@ -50,12 +48,177 @@ class MyHomePageState extends State<MyHomePage> {
     setState(() {});
   }
 
+  Future<void> _adicionarProduto() async {
+    final nomeController = TextEditingController();
+    final unidadeController = TextEditingController();
+    final quantidadeController = TextEditingController();
+    final condicaoController = TextEditingController(text: 'novo');
+    String? categoriaSelecionada;
+
+    // Buscar categorias existentes
+    final categorias = await fetchCategorias();
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Adicionar Produto'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                value: categoriaSelecionada,
+                items: categorias.map((categoria) {
+                  return DropdownMenuItem(
+                    value: categoria['id'].toString(),
+                    child: Text(categoria['nome']),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  categoriaSelecionada = value;
+                },
+                decoration: const InputDecoration(labelText: 'Categoria'),
+              ),
+              TextField(
+                controller: nomeController,
+                decoration: const InputDecoration(labelText: 'Nome do Produto'),
+              ),
+              TextField(
+                controller: unidadeController,
+                decoration: const InputDecoration(labelText: 'Unidade'),
+              ),
+              TextField(
+                controller: quantidadeController,
+                decoration: const InputDecoration(labelText: 'Quantidade'),
+                keyboardType: TextInputType.number,
+              ),
+              DropdownButtonFormField<String>(
+                value: condicaoController.text,
+                items: const [
+                  DropdownMenuItem(value: 'novo', child: Text('Novo')),
+                  DropdownMenuItem(value: 'usado', child: Text('Usado')),
+                ],
+                onChanged: (value) {
+                  condicaoController.text = value ?? 'novo';
+                },
+                decoration: const InputDecoration(labelText: 'Condição'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                if (categoriaSelecionada == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Selecione uma categoria.')),
+                  );
+                  return;
+                }
+
+                final produto = Produto(
+                  id: '',
+                  nome: nomeController.text.trim(),
+                  categoriaId: categoriaSelecionada!,
+                  condicao: condicaoController.text,
+                  unidade: unidadeController.text.trim(),
+                  quantidade: int.tryParse(quantidadeController.text.trim()) ?? 0,
+                  criadoEm: DateTime.now(),
+                );
+
+                final response = await createProduto(produto);
+                if (!mounted) return;
+                if (response) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Produto criado com sucesso!')),
+                    );
+                  }
+                  if (mounted) Navigator.pop(context);
+                } else {
+                  _logger.severe('Erro ao salvar o produto. Verifique os dados enviados e a conexão com a API.');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Erro ao criar produto: Verifique os dados e tente novamente.')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Salvar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _adicionarCategoria() async {
+    final categoriaController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Criar Categoria'),
+          content: TextField(
+            controller: categoriaController,
+            decoration: const InputDecoration(labelText: 'Nome da Categoria'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final categoria = categoriaController.text.trim();
+                if (categoria.isNotEmpty) {
+                  final response = await createCategoria(categoria);
+                  if (!mounted) return;
+                  if (response) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Categoria criada com sucesso!')),
+                      );
+                    }
+                    if (mounted) Navigator.pop(context);
+                  } else {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Erro ao criar categoria.')),
+                      );
+                    }
+                  }
+                }
+              },
+              child: const Text('Salvar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gestão de Estoque'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _adicionarProduto,
+          ),
+          IconButton(
+            icon: const Icon(Icons.category),
+            onPressed: _adicionarCategoria,
+          ),
+        ],
       ),
       drawer: _buildDrawer(context),
       body: SingleChildScrollView(
@@ -154,46 +317,6 @@ class MyHomePageState extends State<MyHomePage> {
                   }
                 },
               ),
-              const SizedBox(height: 16),
-              _buildSectionTitle('Movimentações de Estoque'),
-              FutureBuilder<List<Map<String, dynamic>>>(
-                future: fetchDados('movimentacoes_estoque'),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return const Center(child: Text('Erro ao carregar movimentações'));
-                  } else if (snapshot.hasData) {
-                    final movimentacoes = snapshot.data?.map((json) => MovimentacaoEstoque.fromJson(json)).toList() ?? [];
-                    return movimentacoes.isEmpty
-                        ? const Center(child: Text('Nenhuma movimentação encontrada'))
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: movimentacoes.length,
-                            itemBuilder: (context, index) {
-                              final movimentacao = movimentacoes[index];
-                              return Card(
-                                margin: const EdgeInsets.symmetric(vertical: 8.0),
-                                child: ListTile(
-                                  title: Text('Produto ID: ${movimentacao.produtoId}'),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text('Tipo: ${movimentacao.tipo}'),
-                                      Text('Quantidade: ${movimentacao.quantidade}'),
-                                      Text('Data: ${movimentacao.dataMovimentacao.toLocal()}'),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          );
-                  } else {
-                    return const Center(child: Text('Nenhum dado encontrado'));
-                  }
-                },
-              ),
             ],
           ),
         ),
@@ -214,18 +337,17 @@ class MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  // Função de callback para login
   void onLogin(BuildContext context, AuthModel authModel) {
     final username = _usernameController.text;
     final password = _passwordController.text;
     authModel.login(username, password);
 
     if (authModel.isAuthenticated) {
-      Navigator.pushReplacementNamed(context, '/home'); // Navega para a página inicial
+      Navigator.pushReplacementNamed(context, '/home');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Login falhou'), // Mensagem de falha no login
+          content: Text('Login falhou'),
         ),
       );
     }

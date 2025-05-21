@@ -54,7 +54,7 @@ class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ProdutoEdicaoPage(produto: produto),
+                  builder: (context) => const ProdutoEdicaoPage(), // Removendo o parâmetro 'produto'
                 ),
               );
             },

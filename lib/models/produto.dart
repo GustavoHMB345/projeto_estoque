@@ -18,14 +18,18 @@ class Produto {
   });
 
   factory Produto.fromJson(Map<String, dynamic> json) {
+    if (json['id'] == null || json['nome'] == null || json['categoria_id'] == null || json['condicao'] == null || json['unidade'] == null) {
+      throw ArgumentError('Campos obrigatórios ausentes no JSON: id, nome, categoria_id, condicao ou unidade.');
+    }
+
     return Produto(
       id: json['id'].toString(),
       nome: json['nome'] ?? '',
       categoriaId: json['categoria_id'].toString(),
       condicao: json['condicao'] ?? '',
       unidade: json['unidade'] ?? '',
-      quantidade: json['quantidade'] != null ? int.tryParse(json['quantidade'].toString()) ?? 0 : 0,
-      criadoEm: json['criado_em'] != null ? DateTime.parse(json['criado_em']) : DateTime.now(),
+      quantidade: json['quantidade'] != null ? int.tryParse(json['quantidade'].toString()) ?? (throw ArgumentError('Quantidade inválida no JSON.')) : 0,
+      criadoEm: json['criado_em'] != null ? DateTime.tryParse(json['criado_em']) ?? (throw ArgumentError('Formato de data inválido para criado_em.')) : DateTime.now(),
     );
   }
 

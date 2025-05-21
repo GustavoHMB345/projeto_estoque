@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/produto.dart';
-import '../consumer_api.dart'; // Import the API logic
+import '../consumer_api.dart';
+// Importa a lógica da API
 
 class ProdutoEdicaoPage extends StatefulWidget {
-  final Produto produto;
-
-  const ProdutoEdicaoPage({super.key, required this.produto});
+  const ProdutoEdicaoPage({super.key});
 
   @override
   ProdutoEdicaoPageState createState() => ProdutoEdicaoPageState();
@@ -22,14 +21,12 @@ class ProdutoEdicaoPageState extends State<ProdutoEdicaoPage> {
   @override
   void initState() {
     super.initState();
-    _nomeController = TextEditingController(text: widget.produto.nome);
-    _categoriaController = TextEditingController(text: widget.produto.categoriaId);
-    _condicaoController = TextEditingController(text: widget.produto.condicao);
-    _unidadeController = TextEditingController(text: widget.produto.unidade);
-    _quantidadeController = TextEditingController(text: widget.produto.quantidade.toString());
-    _dataCriacaoController = TextEditingController(
-      text: widget.produto.criadoEm.toLocal().toString().split(' ')[0],
-    );
+    _nomeController = TextEditingController();
+    _categoriaController = TextEditingController();
+    _condicaoController = TextEditingController(text: 'novo'); // valor padrão
+    _unidadeController = TextEditingController();
+    _quantidadeController = TextEditingController();
+    _dataCriacaoController = TextEditingController();
   }
 
   @override
@@ -43,31 +40,29 @@ class ProdutoEdicaoPageState extends State<ProdutoEdicaoPage> {
     super.dispose();
   }
 
-  Future<void> _salvarAlteracoes() async {
-    final produtoAtualizado = Produto(
-      id: widget.produto.id,
+  Future<void> _criarProduto() async {
+    final novoProduto = Produto( // Garantindo que o ID seja um inteiro
       nome: _nomeController.text,
-      categoriaId: _categoriaController.text,
+      categoriaId: _categoriaController.text.trim(), // Alterando categoriaId para aceitar String diretamente
       condicao: _condicaoController.text,
       unidade: _unidadeController.text,
-      quantidade: int.parse(_quantidadeController.text),
-      criadoEm: DateTime.parse(_dataCriacaoController.text),
+      quantidade: int.tryParse(_quantidadeController.text.trim()) ?? 0, // Convertendo quantidade de String para int
+      criadoEm: DateTime.tryParse(_dataCriacaoController.text.trim()) ?? DateTime.now(), id: '',
     );
 
     try {
-      // Call the API to save the product
-      final response = await updateProduto(produtoAtualizado);
+      final response = await createProduto(novoProduto);
 
       if (response) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Produto atualizado com sucesso!')),
+          const SnackBar(content: Text('Produto criado com sucesso!')),
         );
-        Navigator.pop(context, produtoAtualizado);
+        Navigator.pop(context, novoProduto);
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao atualizar o produto. Verifique os detalhes no log.')),
+          const SnackBar(content: Text('Erro ao criar o produto. Verifique os detalhes no log.')),
         );
       }
     } catch (e) {
@@ -75,7 +70,7 @@ class ProdutoEdicaoPageState extends State<ProdutoEdicaoPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erro: $e')),
       );
-      debugPrint('Erro ao salvar alterações: $e'); // Log error details
+      debugPrint('Erro ao criar produto: $e'); // Log detalhado do erro
     }
   }
 
@@ -83,11 +78,11 @@ class ProdutoEdicaoPageState extends State<ProdutoEdicaoPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Editar Produto'),
+        title: const Text('Criar Produto'),
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
-            onPressed: _salvarAlteracoes,
+            onPressed: _criarProduto,
           ),
         ],
       ),
@@ -101,10 +96,11 @@ class ProdutoEdicaoPageState extends State<ProdutoEdicaoPage> {
             ),
             TextField(
               controller: _categoriaController,
-              decoration: const InputDecoration(labelText: 'Categoria'),
+              decoration: const InputDecoration(labelText: 'Categoria (ID ou Nome)'),
+              keyboardType: TextInputType.text, // Permitir texto para alinhar com a model
             ),
             DropdownButtonFormField<String>(
-              value: _condicaoController.text.isNotEmpty ? _condicaoController.text : 'novo',
+              value: _condicaoController.text,
               items: const [
                 DropdownMenuItem(value: 'novo', child: Text('Novo')),
                 DropdownMenuItem(value: 'usado', child: Text('Usado')),
@@ -124,11 +120,25 @@ class ProdutoEdicaoPageState extends State<ProdutoEdicaoPage> {
               controller: _quantidadeController,
               decoration: const InputDecoration(labelText: 'Quantidade'),
               keyboardType: TextInputType.number,
+              onChanged: (value) {
+                if (int.tryParse(value) == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Quantidade deve ser um número inteiro válido.')),
+                  );
+                }
+              },
             ),
             TextField(
               controller: _dataCriacaoController,
-              decoration: const InputDecoration(labelText: 'Data de Criação (DD-MM-YY)'),
+              decoration: const InputDecoration(labelText: 'Data de Criação (YYYY-MM-DD)'),
               keyboardType: TextInputType.datetime,
+              onChanged: (value) {
+                if (DateTime.tryParse(value) == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Data de criação deve estar no formato YYYY-MM-DD.')),
+                  );
+                }
+              },
             ),
           ],
         ),
