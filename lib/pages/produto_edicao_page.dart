@@ -4,7 +4,9 @@ import '../consumer_api.dart';
 // Importa a lógica da API
 
 class ProdutoEdicaoPage extends StatefulWidget {
-  const ProdutoEdicaoPage({super.key});
+  final Produto produto;
+
+  const ProdutoEdicaoPage({super.key, required this.produto});
 
   @override
   ProdutoEdicaoPageState createState() => ProdutoEdicaoPageState();
@@ -14,19 +16,19 @@ class ProdutoEdicaoPageState extends State<ProdutoEdicaoPage> {
   late TextEditingController _nomeController;
   late TextEditingController _categoriaController;
   late TextEditingController _condicaoController;
-  late TextEditingController _unidadeController;
+  late TextEditingController _predioController;
   late TextEditingController _quantidadeController;
   late TextEditingController _dataCriacaoController;
 
   @override
   void initState() {
     super.initState();
-    _nomeController = TextEditingController();
-    _categoriaController = TextEditingController();
-    _condicaoController = TextEditingController(text: 'novo'); // valor padrão
-    _unidadeController = TextEditingController();
-    _quantidadeController = TextEditingController();
-    _dataCriacaoController = TextEditingController();
+    _nomeController = TextEditingController(text: widget.produto.nome);
+    _categoriaController = TextEditingController(text: widget.produto.categoriaId);
+    _condicaoController = TextEditingController(text: widget.produto.condicao);
+    _predioController = TextEditingController(text: widget.produto.predio);
+    _quantidadeController = TextEditingController(text: widget.produto.quantidade.toString());
+    _dataCriacaoController = TextEditingController(text: widget.produto.criadoEm.toIso8601String());
   }
 
   @override
@@ -34,20 +36,28 @@ class ProdutoEdicaoPageState extends State<ProdutoEdicaoPage> {
     _nomeController.dispose();
     _categoriaController.dispose();
     _condicaoController.dispose();
-    _unidadeController.dispose();
+    _predioController.dispose();
     _quantidadeController.dispose();
     _dataCriacaoController.dispose();
     super.dispose();
   }
 
   Future<void> _criarProduto() async {
-    final novoProduto = Produto( // Garantindo que o ID seja um inteiro
+    // Updated to fetch and display the correct nomeCategoria
+    final categorias = await fetchCategorias();
+    final categoriaSelecionada = categorias.firstWhere(
+      (cat) => cat['id'] == _categoriaController.text,
+      orElse: () => {'nome_categoria': 'Desconhecido'},
+    );
+
+    final novoProduto = Produto(
       nome: _nomeController.text,
-      categoriaId: _categoriaController.text.trim(), // Alterando categoriaId para aceitar String diretamente
       condicao: _condicaoController.text,
-      unidade: _unidadeController.text,
-      quantidade: int.tryParse(_quantidadeController.text.trim()) ?? 0, // Convertendo quantidade de String para int
-      criadoEm: DateTime.tryParse(_dataCriacaoController.text.trim()) ?? DateTime.now(), id: '',
+      predio: _predioController.text,
+      quantidade: int.tryParse(_quantidadeController.text.trim()) ?? 0,
+      criadoEm: DateTime.tryParse(_dataCriacaoController.text.trim()) ?? DateTime.now(),
+      categoriaId: _categoriaController.text,
+      nomeCategoria: categoriaSelecionada['nome_categoria'],
     );
 
     try {
@@ -113,8 +123,8 @@ class ProdutoEdicaoPageState extends State<ProdutoEdicaoPage> {
               decoration: const InputDecoration(labelText: 'Condição'),
             ),
             TextField(
-              controller: _unidadeController,
-              decoration: const InputDecoration(labelText: 'Unidade'),
+              controller: _predioController,
+              decoration: const InputDecoration(labelText: 'Predio'),
             ),
             TextField(
               controller: _quantidadeController,

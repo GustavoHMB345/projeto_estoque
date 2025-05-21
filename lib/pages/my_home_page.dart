@@ -50,7 +50,7 @@ class MyHomePageState extends State<MyHomePage> {
 
   Future<void> _adicionarProduto() async {
     final nomeController = TextEditingController();
-    final unidadeController = TextEditingController();
+    final predioController = TextEditingController();
     final quantidadeController = TextEditingController();
     final condicaoController = TextEditingController(text: 'novo');
     String? categoriaSelecionada;
@@ -70,9 +70,9 @@ class MyHomePageState extends State<MyHomePage> {
               DropdownButtonFormField<String>(
                 value: categoriaSelecionada,
                 items: categorias.map((categoria) {
-                  return DropdownMenuItem(
-                    value: categoria['id'].toString(),
-                    child: Text(categoria['nome']),
+                  return DropdownMenuItem<String>(
+                    value: categoria['nome_categoria'] as String, // Use nome_categoria directly
+                    child: Text(categoria['nome_categoria'] as String),
                   );
                 }).toList(),
                 onChanged: (value) {
@@ -85,8 +85,8 @@ class MyHomePageState extends State<MyHomePage> {
                 decoration: const InputDecoration(labelText: 'Nome do Produto'),
               ),
               TextField(
-                controller: unidadeController,
-                decoration: const InputDecoration(labelText: 'Unidade'),
+                controller: predioController,
+                decoration: const InputDecoration(labelText: 'Predio'),
               ),
               TextField(
                 controller: quantidadeController,
@@ -121,13 +121,13 @@ class MyHomePageState extends State<MyHomePage> {
                 }
 
                 final produto = Produto(
-                  id: '',
                   nome: nomeController.text.trim(),
-                  categoriaId: categoriaSelecionada!,
                   condicao: condicaoController.text,
-                  unidade: unidadeController.text.trim(),
+                  predio: predioController.text.trim(),
                   quantidade: int.tryParse(quantidadeController.text.trim()) ?? 0,
                   criadoEm: DateTime.now(),
+                  categoriaId: categoriaSelecionada ?? '',
+                  nomeCategoria: categorias.firstWhere((cat) => cat['id'] == categoriaSelecionada)['nome_categoria'] ?? '',
                 );
 
                 final response = await createProduto(produto);
@@ -257,9 +257,9 @@ class MyHomePageState extends State<MyHomePage> {
                                   subtitle: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('Categoria: ${produto.categoriaId}'),
+                                      Text('Categoria: ${produto.nomeCategoria}'),
                                       Text('Condição: ${produto.condicao}'),
-                                      Text('Unidade: ${produto.unidade}'),
+                                      Text('Predio: ${produto.predio}'),
                                       Text('Quantidade: ${produto.quantidade}'),
                                       Text('Criado em: '
                                           '${produto.criadoEm.toLocal().day.toString().padLeft(2, '0')}-'

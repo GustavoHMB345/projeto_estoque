@@ -3,7 +3,7 @@ import 'package:logging/logging.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'models/produto.dart';
-import 'package:flutter/foundation.dart'; // Import for debugging
+import 'package:flutter/foundation.dart'; 
 
 final Logger _logger = Logger('AuthManager');
 const String apiUrl = 'http://192.168.2.112:3000';
@@ -87,22 +87,45 @@ Future<List<Map<String, dynamic>>> fetchMovimentacoesEstoque() async {
 }
 
 Future<bool> createProduto(Produto produto) async {
-  if (produto.nome.isEmpty || produto.categoriaId.isEmpty || produto.unidade.isEmpty || produto.quantidade <= 0) {
-    _logger.severe('Erro: Dados inválidos para o produto. Verifique os campos obrigatórios.');
+  final criadoEmFormatado = produto.criadoEm.toIso8601String().split('T')[0]; // Formatar a data
+
+  print('Dados enviados para a API: ${produto.toJson()}'); // Log dos dados enviados
+
+  if (produto.nome.isEmpty || produto.predio.isEmpty || produto.quantidade <= 0) {
+    final missingFields = [];
+    if (produto.nome.isEmpty) missingFields.add('nome');
+    if (produto.predio.isEmpty) missingFields.add('predio');
+    if (produto.quantidade <= 0) missingFields.add('quantidade');
+
+    _logger.severe('Erro: Dados inválidos para o produto. Campos obrigatórios ausentes: ${missingFields.join(', ')}.');
     return false;
   }
 
-  final url = Uri.parse('http://localhost:3000/produtos');
-  final response = await http.post(
-    url,
-    headers: {'Content-Type': 'application/json'},
-    body: jsonEncode(produto.toJson()),
-  );
+  final url = Uri.parse('$apiUrl/produtos');
+  try {
+    // Ensure categoriaId and nomeCategoria are handled correctly
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'nome': produto.nome,
+        'condicao': produto.condicao,
+        'predio': produto.predio,
+        'quantidade': produto.quantidade,
+        'criado_em': produto.criadoEm.toIso8601String(),
+        'categoria_id': produto.categoriaId,
+        'nome_categoria': produto.nomeCategoria,
+      }),
+    );
 
-  if (response.statusCode == 201) {
-    return true;
-  } else {
-    _logger.severe('Erro ao criar produto: Código de status ${response.statusCode}, Resposta: ${response.body}');
+    if (response.statusCode == 201) {
+      return true;
+    } else {
+      _logger.severe('Erro ao criar produto: Código de status ${response.statusCode}, Resposta: ${response.body}');
+      return false;
+    }
+  } catch (e) {
+    _logger.severe('Exceção ao criar produto: $e');
     return false;
   }
 }
@@ -121,11 +144,6 @@ Future<bool> createCategoria(String categoria) async {
     debugPrint('Erro ao criar categoria: ${response.body}');
     return false;
   }
-}
-
-// Removendo a integração de 'id' nas funções relacionadas a categorias e produtos
-Future<Produto> fetchProdutoAtualizado(String id) async {
-  throw Exception('Função desativada devido à remoção de id');
 }
 
 Future<bool> updateProduto(Produto produto) async {
