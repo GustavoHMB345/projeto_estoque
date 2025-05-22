@@ -203,6 +203,11 @@ class MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  // Updated to fetch data directly from the produtos table
+  Future<List<Map<String, dynamic>>> fetchProdutos() async {
+    return await fetchDados('produtos');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -229,7 +234,7 @@ class MyHomePageState extends State<MyHomePage> {
             children: [
               _buildSectionTitle('Produtos'),
               FutureBuilder<List<Map<String, dynamic>>>(
-                future: fetchDados('produtos'),
+                future: fetchProdutos(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
