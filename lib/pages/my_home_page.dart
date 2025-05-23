@@ -49,12 +49,10 @@ class MyHomePageState extends State<MyHomePage> {
 
   Future<void> _adicionarProduto() async {
     final nomeController = TextEditingController();
-    final predioController = TextEditingController();
+    final unidadeController = TextEditingController();
     final quantidadeController = TextEditingController();
     final condicaoController = TextEditingController(text: 'novo');
-    final unidadeController = TextEditingController();
-    String? categoriaSelecionada;
-    final categorias = (await fetchCategorias()).map((cat) => cat['nome_categoria'] as String).toList();
+
     if (!mounted) return;
     await showDialog(
       context: context,
@@ -64,22 +62,9 @@ class MyHomePageState extends State<MyHomePage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              DropdownButtonFormField<String>(
-                value: categoriaSelecionada,
-                items: categorias.map((cat) => DropdownMenuItem<String>(
-                  value: cat,
-                  child: Text(cat),
-                )).toList(),
-                onChanged: (value) => categoriaSelecionada = value,
-                decoration: const InputDecoration(labelText: 'Categoria'),
-              ),
               TextField(
                 controller: nomeController,
                 decoration: const InputDecoration(labelText: 'Nome do Produto'),
-              ),
-              TextField(
-                controller: predioController,
-                decoration: const InputDecoration(labelText: 'Prédio'),
               ),
               TextField(
                 controller: unidadeController,
@@ -108,33 +93,25 @@ class MyHomePageState extends State<MyHomePage> {
             ),
             TextButton(
               onPressed: () async {
-                if (categoriaSelecionada == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Selecione uma categoria.')),
-                  );
-                  return;
-                }
                 final produto = Produto(
+                  id: '',
                   nome: nomeController.text.trim(),
                   condicao: condicaoController.text,
-                  predio: predioController.text.trim(),
-                  unidade: unidadeController.text.trim(),
                   quantidade: int.tryParse(quantidadeController.text.trim()) ?? 0,
                   criadoEm: DateTime.now(),
-                  categoriaId: '',
-                  nomeCategoria: categoriaSelecionada!,
                 );
-                final response = await createProduto(produto);
+                final response = await createItem('produtos', produto.toJson());
                 if (!mounted) return;
                 if (response) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Produto criado com sucesso!')),
                   );
                   Navigator.pop(context);
+                  setState(() {});
                 } else {
                   _logger.severe('Erro ao salvar o produto. Verifique os dados enviados e a conexão com a API.');
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erro ao criar produto: Verifique os dados e tente novamente.')),
+                    const SnackBar(content: Text('Erro ao criar produto: Verifique os dados e tente novamente.')),
                   );
                 }
               },
@@ -144,52 +121,6 @@ class MyHomePageState extends State<MyHomePage> {
         );
       },
     );
-  }
-
-  Future<void> _adicionarCategoria() async {
-    final categoriaController = TextEditingController();
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Criar Categoria'),
-          content: TextField(
-            controller: categoriaController,
-            decoration: const InputDecoration(labelText: 'Nome da Categoria'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () async {
-                final categoria = categoriaController.text.trim();
-                if (categoria.isNotEmpty) {
-                  final response = await createCategoria(categoria);
-                  if (!mounted) return;
-                  if (response) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Categoria criada com sucesso!')),
-                    );
-                    Navigator.pop(context);
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Erro ao criar categoria.')),
-                    );
-                  }
-                }
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<List<Map<String, dynamic>>> fetchProdutos() async {
-    return await fetchDados('produtos');
   }
 
   @override
@@ -203,10 +134,6 @@ class MyHomePageState extends State<MyHomePage> {
             icon: const Icon(Icons.add),
             onPressed: _adicionarProduto,
           ),
-          IconButton(
-            icon: const Icon(Icons.category),
-            onPressed: _adicionarCategoria,
-          ),
         ],
       ),
       drawer: _buildDrawer(context),
@@ -218,7 +145,7 @@ class MyHomePageState extends State<MyHomePage> {
             children: [
               _buildSectionTitle('Produtos'),
               FutureBuilder<List<Map<String, dynamic>>>(
-                future: fetchProdutos(),
+                future: fetchDados('produtos'),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
@@ -246,9 +173,8 @@ class MyHomePageState extends State<MyHomePage> {
                                   subtitle: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('Categoria: \\${produto.nomeCategoria}'),
                                       Text('Condição: \\${produto.condicao}'),
-                                      Text('Predio: \\${produto.predio}'),
+                                      Text('Unidade: \\${produto.unidade ?? ''}'),
                                       Text('Quantidade: \\${produto.quantidade}'),
                                       Text('Criado em: '
                                           '\\${produto.criadoEm.toLocal().day.toString().padLeft(2, '0')}-'
