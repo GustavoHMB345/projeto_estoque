@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../providers/auth_model.dart';
 import '../providers/app_state.dart';
 import '../consumer_api.dart';
-import '../models/categoria.dart';
 import '../models/produto.dart';
 import 'package:logging/logging.dart';
 
@@ -53,12 +52,10 @@ class MyHomePageState extends State<MyHomePage> {
     final predioController = TextEditingController();
     final quantidadeController = TextEditingController();
     final condicaoController = TextEditingController(text: 'novo');
+    final unidadeController = TextEditingController();
     String? categoriaSelecionada;
-
-    // Buscar categorias existentes
-    final categorias = await fetchCategorias();
+    final categorias = (await fetchCategorias()).map((cat) => cat['nome_categoria'] as String).toList();
     if (!mounted) return;
-
     await showDialog(
       context: context,
       builder: (context) {
@@ -69,15 +66,11 @@ class MyHomePageState extends State<MyHomePage> {
             children: [
               DropdownButtonFormField<String>(
                 value: categoriaSelecionada,
-                items: categorias.map((categoria) {
-                  return DropdownMenuItem<String>(
-                    value: categoria['nome_categoria'] as String, // Use nome_categoria directly
-                    child: Text(categoria['nome_categoria'] as String),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  categoriaSelecionada = value;
-                },
+                items: categorias.map((cat) => DropdownMenuItem<String>(
+                  value: cat,
+                  child: Text(cat),
+                )).toList(),
+                onChanged: (value) => categoriaSelecionada = value,
                 decoration: const InputDecoration(labelText: 'Categoria'),
               ),
               TextField(
@@ -86,7 +79,11 @@ class MyHomePageState extends State<MyHomePage> {
               ),
               TextField(
                 controller: predioController,
-                decoration: const InputDecoration(labelText: 'Predio'),
+                decoration: const InputDecoration(labelText: 'Prédio'),
+              ),
+              TextField(
+                controller: unidadeController,
+                decoration: const InputDecoration(labelText: 'Unidade'),
               ),
               TextField(
                 controller: quantidadeController,
@@ -99,9 +96,7 @@ class MyHomePageState extends State<MyHomePage> {
                   DropdownMenuItem(value: 'novo', child: Text('Novo')),
                   DropdownMenuItem(value: 'usado', child: Text('Usado')),
                 ],
-                onChanged: (value) {
-                  condicaoController.text = value ?? 'novo';
-                },
+                onChanged: (value) => condicaoController.text = value ?? 'novo',
                 decoration: const InputDecoration(labelText: 'Condição'),
               ),
             ],
@@ -119,33 +114,28 @@ class MyHomePageState extends State<MyHomePage> {
                   );
                   return;
                 }
-
                 final produto = Produto(
                   nome: nomeController.text.trim(),
                   condicao: condicaoController.text,
                   predio: predioController.text.trim(),
+                  unidade: unidadeController.text.trim(),
                   quantidade: int.tryParse(quantidadeController.text.trim()) ?? 0,
                   criadoEm: DateTime.now(),
-                  categoriaId: categoriaSelecionada ?? '',
-                  nomeCategoria: categorias.firstWhere((cat) => cat['id'] == categoriaSelecionada)['nome_categoria'] ?? '',
+                  categoriaId: '',
+                  nomeCategoria: categoriaSelecionada!,
                 );
-
                 final response = await createProduto(produto);
                 if (!mounted) return;
                 if (response) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Produto criado com sucesso!')),
-                    );
-                  }
-                  if (mounted) Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Produto criado com sucesso!')),
+                  );
+                  Navigator.pop(context);
                 } else {
                   _logger.severe('Erro ao salvar o produto. Verifique os dados enviados e a conexão com a API.');
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Erro ao criar produto: Verifique os dados e tente novamente.')),
-                    );
-                  }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Erro ao criar produto: Verifique os dados e tente novamente.')),
+                  );
                 }
               },
               child: const Text('Salvar'),
@@ -158,7 +148,6 @@ class MyHomePageState extends State<MyHomePage> {
 
   Future<void> _adicionarCategoria() async {
     final categoriaController = TextEditingController();
-
     await showDialog(
       context: context,
       builder: (context) {
@@ -180,18 +169,14 @@ class MyHomePageState extends State<MyHomePage> {
                   final response = await createCategoria(categoria);
                   if (!mounted) return;
                   if (response) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Categoria criada com sucesso!')),
-                      );
-                    }
-                    if (mounted) Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Categoria criada com sucesso!')),
+                    );
+                    Navigator.pop(context);
                   } else {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Erro ao criar categoria.')),
-                      );
-                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Erro ao criar categoria.')),
+                    );
                   }
                 }
               },
@@ -203,7 +188,6 @@ class MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  // Updated to fetch data directly from the produtos table
   Future<List<Map<String, dynamic>>> fetchProdutos() async {
     return await fetchDados('produtos');
   }
@@ -241,7 +225,7 @@ class MyHomePageState extends State<MyHomePage> {
                   } else if (snapshot.hasError) {
                     return Center(
                       child: Text(
-                        'Erro ao carregar produtos: ${snapshot.error}',
+                        'Erro ao carregar produtos: \\${snapshot.error}',
                         style: const TextStyle(color: Colors.red),
                       ),
                     );
@@ -262,14 +246,14 @@ class MyHomePageState extends State<MyHomePage> {
                                   subtitle: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('Categoria: ${produto.nomeCategoria}'),
-                                      Text('Condição: ${produto.condicao}'),
-                                      Text('Predio: ${produto.predio}'),
-                                      Text('Quantidade: ${produto.quantidade}'),
+                                      Text('Categoria: \\${produto.nomeCategoria}'),
+                                      Text('Condição: \\${produto.condicao}'),
+                                      Text('Predio: \\${produto.predio}'),
+                                      Text('Quantidade: \\${produto.quantidade}'),
                                       Text('Criado em: '
-                                          '${produto.criadoEm.toLocal().day.toString().padLeft(2, '0')}-'
-                                          '${produto.criadoEm.toLocal().month.toString().padLeft(2, '0')}-'
-                                          '${produto.criadoEm.toLocal().year.toString().substring(2)}'),
+                                          '\\${produto.criadoEm.toLocal().day.toString().padLeft(2, '0')}-'
+                                          '\\${produto.criadoEm.toLocal().month.toString().padLeft(2, '0')}-'
+                                          '\\${produto.criadoEm.toLocal().year.toString().substring(2)}'),
                                     ],
                                   ),
                                   onTap: () {
@@ -290,38 +274,6 @@ class MyHomePageState extends State<MyHomePage> {
                 },
               ),
               const SizedBox(height: 16),
-              _buildSectionTitle('Categorias'),
-              FutureBuilder<List<Map<String, dynamic>>>(
-                future: fetchDados('categorias'),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return const Center(child: Text('Erro ao carregar categorias'));
-                  } else if (snapshot.hasData) {
-                    final categorias = snapshot.data?.map((json) => Categoria.fromJson(json)).toList() ?? [];
-                    return categorias.isEmpty
-                        ? const Center(child: Text('Nenhuma categoria encontrada'))
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: categorias.length,
-                            itemBuilder: (context, index) {
-                              final categoria = categorias[index];
-                              return Card(
-                                margin: const EdgeInsets.symmetric(vertical: 8.0),
-                                child: ListTile(
-                                  title: Text(categoria.nome),
-                                  subtitle: Text('Descrição: ${categoria.descricao}'),
-                                ),
-                              );
-                            },
-                          );
-                  } else {
-                    return const Center(child: Text('Nenhum dado encontrado'));
-                  }
-                },
-              ),
             ],
           ),
         ),

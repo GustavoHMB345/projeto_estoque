@@ -44,12 +44,10 @@ Future<List<Map<String, dynamic>>> fetchDados(String pesquisa) async {
 
 Future<List<Map<String, dynamic>>> fetchCategorias() async {
   final client = http.Client();
-
   try {
     final response = await client.get(
-      Uri.parse('http://192.168.2.112:3000/categorias'),
+      Uri.parse('$apiUrl/produtos/categorias'),
     ).timeout(const Duration(seconds: 30));
-
     if (response.statusCode == 200) {
       final jsonData = jsonDecode(response.body) as List<dynamic>;
       return jsonData.cast<Map<String, dynamic>>();
@@ -130,14 +128,13 @@ Future<bool> createProduto(Produto produto) async {
   }
 }
 
-Future<bool> createCategoria(String categoria) async {
-  final url = Uri.parse('$apiUrl/categorias');
+Future<bool> createCategoria(String nomeCategoria) async {
+  final url = Uri.parse('$apiUrl/produtos');
   final response = await http.post(
     url,
     headers: {'Content-Type': 'application/json'},
-    body: jsonEncode({'nome': categoria}),
+    body: jsonEncode({'nome_categoria': nomeCategoria}),
   );
-
   if (response.statusCode == 201) {
     return true;
   } else {
@@ -146,6 +143,38 @@ Future<bool> createCategoria(String categoria) async {
   }
 }
 
-Future<bool> updateProduto(Produto produto) async {
-  throw Exception('Função desativada devido à remoção de id');
+Future<bool> updateProduto(Produto produto, String id) async {
+  final url = Uri.parse('$apiUrl/produtos/$id');
+  try {
+    final response = await http.put(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(produto.toJson()),
+    );
+    if (response.statusCode == 200) {
+      return true;
+    } else {
+      _logger.severe('Erro ao atualizar produto: Código de status ${response.statusCode}, Resposta: ${response.body}');
+      return false;
+    }
+  } catch (e) {
+    _logger.severe('Exceção ao atualizar produto: $e');
+    return false;
+  }
+}
+
+Future<bool> deleteProduto(String id) async {
+  final url = Uri.parse('$apiUrl/produtos/$id');
+  try {
+    final response = await http.delete(url);
+    if (response.statusCode == 200) {
+      return true;
+    } else {
+      _logger.severe('Erro ao deletar produto: Código de status ${response.statusCode}, Resposta: ${response.body}');
+      return false;
+    }
+  } catch (e) {
+    _logger.severe('Exceção ao deletar produto: $e');
+    return false;
+  }
 }

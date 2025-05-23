@@ -19,6 +19,7 @@ class ProdutoEdicaoPageState extends State<ProdutoEdicaoPage> {
   late TextEditingController _predioController;
   late TextEditingController _quantidadeController;
   late TextEditingController _dataCriacaoController;
+  late TextEditingController _unidadeController;
 
   @override
   void initState() {
@@ -29,6 +30,7 @@ class ProdutoEdicaoPageState extends State<ProdutoEdicaoPage> {
     _predioController = TextEditingController(text: widget.produto.predio);
     _quantidadeController = TextEditingController(text: widget.produto.quantidade.toString());
     _dataCriacaoController = TextEditingController(text: widget.produto.criadoEm.toIso8601String());
+    _unidadeController = TextEditingController(text: widget.produto.unidade);
   }
 
   @override
@@ -39,30 +41,46 @@ class ProdutoEdicaoPageState extends State<ProdutoEdicaoPage> {
     _predioController.dispose();
     _quantidadeController.dispose();
     _dataCriacaoController.dispose();
+    _unidadeController.dispose();
     super.dispose();
   }
 
   Future<void> _criarProduto() async {
-    // Updated to fetch and display the correct nomeCategoria
-    final categorias = await fetchCategorias();
-    final categoriaSelecionada = categorias.firstWhere(
-      (cat) => cat['id'] == _categoriaController.text,
-      orElse: () => {'nome_categoria': 'Desconhecido'},
-    );
+    // Se for categoria, só envia nomeCategoria e não chama fetchCategorias
+    final isCategoria = _nomeController.text.isEmpty && _predioController.text.isEmpty && _unidadeController.text.isEmpty && (_quantidadeController.text.isEmpty || int.tryParse(_quantidadeController.text) == 0);
 
+    if (isCategoria) {
+      // Chama diretamente o endpoint de categoria
+      final response = await createCategoria(_categoriaController.text);
+      if (response) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Categoria criada com sucesso!')),
+        );
+        Navigator.pop(context);
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao criar a categoria. Verifique os detalhes no log.')),
+        );
+      }
+      return;
+    }
+
+    // Produto normal
     final novoProduto = Produto(
       nome: _nomeController.text,
       condicao: _condicaoController.text,
       predio: _predioController.text,
+      unidade: _unidadeController.text,
       quantidade: int.tryParse(_quantidadeController.text.trim()) ?? 0,
       criadoEm: DateTime.tryParse(_dataCriacaoController.text.trim()) ?? DateTime.now(),
-      categoriaId: _categoriaController.text,
-      nomeCategoria: categoriaSelecionada['nome_categoria'],
+      categoriaId: '',
+      nomeCategoria: _categoriaController.text,
     );
 
     try {
       final response = await createProduto(novoProduto);
-
       if (response) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -80,7 +98,7 @@ class ProdutoEdicaoPageState extends State<ProdutoEdicaoPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erro: $e')),
       );
-      debugPrint('Erro ao criar produto: $e'); // Log detalhado do erro
+      debugPrint('Erro ao criar produto: $e');
     }
   }
 
@@ -149,6 +167,10 @@ class ProdutoEdicaoPageState extends State<ProdutoEdicaoPage> {
                   );
                 }
               },
+            ),
+            TextField(
+              controller: _unidadeController,
+              decoration: const InputDecoration(labelText: 'Unidade'),
             ),
           ],
         ),
