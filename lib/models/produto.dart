@@ -4,7 +4,6 @@ class Produto {
   final String condicao;
   final int quantidade;
   final DateTime criadoEm;
-  final String? unidade;
 
   Produto({
     required this.id,
@@ -12,7 +11,6 @@ class Produto {
     required this.condicao,
     required this.quantidade,
     required this.criadoEm,
-    this.unidade,
   });
 
   factory Produto.fromJson(Map<String, dynamic> json) {
@@ -22,18 +20,20 @@ class Produto {
       condicao: json['condicao'] ?? '',
       quantidade: int.tryParse(json['quantidade'].toString()) ?? 0,
       criadoEm: DateTime.parse(json['data_criacao'] ?? DateTime.now().toIso8601String()),
-      unidade: json['unidade'],
+      
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
+  Map<String, dynamic> toJson({bool includeDataCriacao = true}) {
+    final map = {
       'id': id,
       'nome': nome,
       'condicao': condicao,
       'quantidade': quantidade,
-      'data_criacao': criadoEm.toIso8601String(),
-      'unidade': unidade,
     };
+    if (includeDataCriacao) {
+      map['data_criacao'] = criadoEm.toIso8601String();
+    }
+    return map;
   }
 }

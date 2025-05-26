@@ -64,4 +64,14 @@ Future<bool> deleteItem(String endpoint, String id) async {
   return response.statusCode == 200;
 }
 
+Future<List<Map<String, dynamic>>> fetchHistoricoProduto(int idProduto) async {
+  final response = await http.get(Uri.parse('$apiBaseUrl/historico/$idProduto'));
+  if (response.statusCode == 200) {
+    final List<dynamic> data = json.decode(response.body);
+    return data.map((item) => item as Map<String, dynamic>).toList();
+  } else {
+    throw Exception('Erro ao buscar histórico do produto');
+  }
+}
+
 // Funções genéricas para CRUD já estão corretas, não precisa alterar.

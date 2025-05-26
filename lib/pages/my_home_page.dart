@@ -49,7 +49,6 @@ class MyHomePageState extends State<MyHomePage> {
 
   Future<void> _adicionarProduto() async {
     final nomeController = TextEditingController();
-    final unidadeController = TextEditingController();
     final quantidadeController = TextEditingController();
     final condicaoController = TextEditingController(text: 'novo');
 
@@ -65,10 +64,6 @@ class MyHomePageState extends State<MyHomePage> {
               TextField(
                 controller: nomeController,
                 decoration: const InputDecoration(labelText: 'Nome do Produto'),
-              ),
-              TextField(
-                controller: unidadeController,
-                decoration: const InputDecoration(labelText: 'Unidade'),
               ),
               TextField(
                 controller: quantidadeController,
@@ -116,6 +111,80 @@ class MyHomePageState extends State<MyHomePage> {
                 }
               },
               child: const Text('Salvar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _editarProduto(Produto produto) async {
+    final nomeController = TextEditingController(text: produto.nome);
+    final quantidadeController = TextEditingController(text: produto.quantidade.toString());
+    final condicaoController = TextEditingController(text: produto.condicao);
+
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Editar Produto'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nomeController,
+                decoration: const InputDecoration(labelText: 'Nome do Produto'),
+              ),
+              TextField(
+                controller: quantidadeController,
+                decoration: const InputDecoration(labelText: 'Quantidade'),
+                keyboardType: TextInputType.number,
+              ),
+              DropdownButtonFormField<String>(
+                value: condicaoController.text,
+                items: const [
+                  DropdownMenuItem(value: 'novo', child: Text('Novo')),
+                  DropdownMenuItem(value: 'usado', child: Text('Usado')),
+                ],
+                onChanged: (value) => condicaoController.text = value ?? 'novo',
+                decoration: const InputDecoration(labelText: 'Condição'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final atualizado = Produto(
+                  id: produto.id,
+                  nome: nomeController.text.trim(),
+                  condicao: condicaoController.text,
+                  quantidade: int.tryParse(quantidadeController.text.trim()) ?? 0,
+                  criadoEm: produto.criadoEm,
+                );
+                final response = await updateItem('produtos', produto.id, atualizado.toJson(includeDataCriacao: false));
+                if (!mounted) return;
+                if (response) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Produto atualizado com sucesso!')),
+                  );
+                  Navigator.pop(context);
+                  setState(() {});
+                } else {
+                  _logger.severe('Erro ao atualizar o produto. Verifique os dados enviados e a conexão com a API.');
+                  // Log no terminal do VS Code
+                  // ignore: avoid_print
+                  print('[ERRO] Falha ao atualizar produto: ${atualizado.toJson()}');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Erro ao atualizar produto: Verifique os dados e tente novamente.')),
+                  );
+                }
+              },
+              child: const Text('Salvar Alterações'),
             ),
           ],
         );
@@ -174,7 +243,6 @@ class MyHomePageState extends State<MyHomePage> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text('Condição: \\${produto.condicao}'),
-                                      Text('Unidade: \\${produto.unidade ?? ''}'),
                                       Text('Quantidade: \\${produto.quantidade}'),
                                       Text('Criado em: '
                                           '\\${produto.criadoEm.toLocal().day.toString().padLeft(2, '0')}-'
@@ -186,10 +254,71 @@ class MyHomePageState extends State<MyHomePage> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => ProdutoDetalhesPage(produto: produto),
+                                        builder: (context) => ProdutoDetalhesPage(
+                                          produto: produto,
+                                          onProdutoEditado: (Produto atualizado) async {
+                                            final response = await updateItem('produtos', atualizado.id, atualizado.toJson(includeDataCriacao: false));
+                                            if (response) {
+                                              setState(() {});
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text('Produto atualizado com sucesso!')),
+                                              );
+                                            } else {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text('Erro ao atualizar produto.')),
+                                              );
+                                            }
+                                          },
+                                        ),
                                       ),
                                     );
                                   },
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit, color: Colors.blue),
+                                        tooltip: 'Editar',
+                                        onPressed: () => _editarProduto(produto),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete, color: Colors.red),
+                                        tooltip: 'Excluir',
+                                        onPressed: () async {
+                                          final confirm = await showDialog<bool>(
+                                            context: context,
+                                            builder: (context) => AlertDialog(
+                                              title: const Text('Excluir Produto'),
+                                              content: const Text('Tem certeza que deseja excluir este produto?'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(context, false),
+                                                  child: const Text('Cancelar'),
+                                                ),
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(context, true),
+                                                  child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (confirm == true) {
+                                            final ok = await deleteItem('produtos', produto.id);
+                                            if (ok) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text('Produto excluído com sucesso!')),
+                                              );
+                                              setState(() {});
+                                            } else {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text('Erro ao excluir produto.')),
+                                              );
+                                            }
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               );
                             },
