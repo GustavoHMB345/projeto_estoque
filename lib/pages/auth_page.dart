@@ -101,14 +101,11 @@ class AuthPage extends StatelessWidget {
     required AuthModel authModel,
   }) {
     return ElevatedButton(
-      onPressed: () {
-        onLogin(context, authModel);
+      onPressed: () async {
+        await onLogin(context, authModel);
 
         if (authModel.isAuthenticated) {
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Usuário ou senha inválidos')),
-          );
+          // Usuário autenticado com sucesso, sem mensagens adicionais
         }
       },
       style: ElevatedButton.styleFrom(

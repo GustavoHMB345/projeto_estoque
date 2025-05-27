@@ -64,13 +64,38 @@ Future<bool> deleteItem(String endpoint, String id) async {
   return response.statusCode == 200;
 }
 
-Future<List<Map<String, dynamic>>> fetchHistoricoProduto(int idProduto) async {
-  final response = await http.get(Uri.parse('$apiBaseUrl/historico/$idProduto'));
-  if (response.statusCode == 200) {
-    final List<dynamic> data = json.decode(response.body);
-    return data.map((item) => item as Map<String, dynamic>).toList();
-  } else {
-    throw Exception('Erro ao buscar histórico do produto');
+Future<List<Map<String, dynamic>>> fetchUsuarios() async {
+  try {
+    final response = await http.get(Uri.parse('$apiBaseUrl/usuarios/tableusuario')).timeout(const Duration(seconds: 30));
+    print('Status Code: ${response.statusCode}');
+    print('Response Body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(json.decode(response.body));
+    } else {
+      throw Exception('Falha ao carregar usuários');
+    }
+  } catch (e) {
+    print('Erro ao executar fetchUsuarios: $e');
+    rethrow;
+  }
+}
+
+Future<void> createUsuario(Map<String, dynamic> usuario) async {
+  final response = await http.post(
+    Uri.parse('$apiBaseUrl/usuarios'),
+    headers: {'Content-Type': 'application/json'},
+    body: json.encode(usuario),
+  );
+  if (response.statusCode != 201) {
+    throw Exception('Falha ao criar usuário');
+  }
+}
+
+Future<void> deleteUsuario(String id) async {
+  final response = await http.delete(Uri.parse('$apiBaseUrl/usuarios/$id'));
+  if (response.statusCode != 200) {
+    throw Exception('Falha ao excluir usuário');
   }
 }
 

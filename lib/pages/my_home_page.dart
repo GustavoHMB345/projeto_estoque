@@ -7,6 +7,7 @@ import '../providers/app_state.dart';
 import '../consumer_api.dart';
 import '../models/produto.dart';
 import 'package:logging/logging.dart';
+import 'usuarios_page.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
@@ -196,11 +197,12 @@ class MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gestão de Estoque'),
+        title: const Text('Gestão de Estoque', style: TextStyle(color: Colors.white)),
         centerTitle: true,
+        backgroundColor: Colors.teal,
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const Icon(Icons.add, color: Colors.white),
             onPressed: _adicionarProduto,
           ),
         ],
@@ -217,18 +219,18 @@ class MyHomePageState extends State<MyHomePage> {
                 future: fetchDados('produtos'),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const Center(child: CircularProgressIndicator(color: Colors.teal));
                   } else if (snapshot.hasError) {
                     return Center(
                       child: Text(
-                        'Erro ao carregar produtos: \\${snapshot.error}',
-                        style: const TextStyle(color: Colors.red),
+                        'Erro ao carregar produtos: \${snapshot.error}',
+                        style: const TextStyle(color: Colors.red, fontSize: 16),
                       ),
                     );
                   } else if (snapshot.hasData) {
                     final produtos = snapshot.data?.map((json) => Produto.fromJson(json)).toList() ?? [];
                     return produtos.isEmpty
-                        ? const Center(child: Text('Nenhum produto encontrado'))
+                        ? const Center(child: Text('Nenhum produto encontrado', style: TextStyle(fontSize: 16)))
                         : ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
@@ -237,39 +239,25 @@ class MyHomePageState extends State<MyHomePage> {
                               final produto = produtos[index];
                               return Card(
                                 margin: const EdgeInsets.symmetric(vertical: 8.0),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12.0),
+                                ),
+                                elevation: 4,
                                 child: ListTile(
-                                  title: Text(produto.nome),
+                                  title: Text(produto.nome, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                                   subtitle: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('Condição: \\${produto.condicao}'),
-                                      Text('Quantidade: \\${produto.quantidade}'),
-                                      Text('Criado em: '
-                                          '\\${produto.criadoEm.toLocal().day.toString().padLeft(2, '0')}-'
-                                          '\\${produto.criadoEm.toLocal().month.toString().padLeft(2, '0')}-'
-                                          '\\${produto.criadoEm.toLocal().year.toString().substring(2)}'),
+                                      Text('Condição: ${produto.condicao}', style: const TextStyle(fontSize: 14)),
+                                      Text('Quantidade: ${produto.quantidade}', style: const TextStyle(fontSize: 14)),
+                                      Text('Criado em: ${produto.criadoEm.toLocal().toString().split(' ')[0]}', style: const TextStyle(fontSize: 14)),
                                     ],
                                   ),
                                   onTap: () {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => ProdutoDetalhesPage(
-                                          produto: produto,
-                                          onProdutoEditado: (Produto atualizado) async {
-                                            final response = await updateItem('produtos', atualizado.id, atualizado.toJson(includeDataCriacao: false));
-                                            if (response) {
-                                              setState(() {});
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(content: Text('Produto atualizado com sucesso!')),
-                                              );
-                                            } else {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(content: Text('Erro ao atualizar produto.')),
-                                              );
-                                            }
-                                          },
-                                        ),
+                                        builder: (context) => ProdutoDetalhesPage(produto: produto),
                                       ),
                                     );
                                   },
@@ -278,43 +266,13 @@ class MyHomePageState extends State<MyHomePage> {
                                     children: [
                                       IconButton(
                                         icon: const Icon(Icons.edit, color: Colors.blue),
-                                        tooltip: 'Editar',
                                         onPressed: () => _editarProduto(produto),
                                       ),
                                       IconButton(
                                         icon: const Icon(Icons.delete, color: Colors.red),
-                                        tooltip: 'Excluir',
                                         onPressed: () async {
-                                          final confirm = await showDialog<bool>(
-                                            context: context,
-                                            builder: (context) => AlertDialog(
-                                              title: const Text('Excluir Produto'),
-                                              content: const Text('Tem certeza que deseja excluir este produto?'),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () => Navigator.pop(context, false),
-                                                  child: const Text('Cancelar'),
-                                                ),
-                                                TextButton(
-                                                  onPressed: () => Navigator.pop(context, true),
-                                                  child: const Text('Excluir', style: TextStyle(color: Colors.red)),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                          if (confirm == true) {
-                                            final ok = await deleteItem('produtos', produto.id);
-                                            if (ok) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(content: Text('Produto excluído com sucesso!')),
-                                              );
-                                              setState(() {});
-                                            } else {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(content: Text('Erro ao excluir produto.')),
-                                              );
-                                            }
-                                          }
+                                          await deleteItem('produtos', produto.id);
+                                          setState(() {});
                                         },
                                       ),
                                     ],
@@ -324,7 +282,7 @@ class MyHomePageState extends State<MyHomePage> {
                             },
                           );
                   } else {
-                    return const Center(child: Text('Nenhum dado encontrado'));
+                    return const Center(child: Text('Nenhum dado encontrado', style: TextStyle(fontSize: 16)));
                   }
                 },
               ),
@@ -366,42 +324,67 @@ class MyHomePageState extends State<MyHomePage> {
   }
 
   Widget _buildDrawer(BuildContext context) {
+    final authModel = Provider.of<AuthModel>(context, listen: false);
+    final emailUsuario = authModel.usuario?.email ?? 'email@exemplo.com';
+    final nomeUsuario = authModel.usuario?.nome ?? 'Nome do Usuário';
+
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          const DrawerHeader(
-            decoration: BoxDecoration(
-              color: Colors.blue,
+          UserAccountsDrawerHeader(
+            accountName: Text(nomeUsuario, style: const TextStyle(fontSize: 18)),
+            accountEmail: Text(emailUsuario, style: const TextStyle(fontSize: 14)),
+            currentAccountPicture: CircleAvatar(
+              backgroundColor: Colors.white,
+              child: const Icon(Icons.person, size: 40, color: Colors.teal),
             ),
-            child: Text('Menu Principal', style: TextStyle(color: Colors.white, fontSize: 24)),
+            decoration: const BoxDecoration(
+              color: Colors.teal,
+            ),
           ),
           ListTile(
-            leading: const Icon(Icons.home),
+            leading: const Icon(Icons.home, color: Colors.teal),
             title: const Text('Home'),
             onTap: () {
-              Navigator.pop(context);
+              Navigator.pushReplacementNamed(context, '/home');
             },
           ),
           ListTile(
-            leading: const Icon(Icons.category),
-            title: const Text('Categorias'),
+            leading: const Icon(Icons.people, color: Colors.teal),
+            title: const Text('Usuários'),
             onTap: () {
-              // Implementar navegação para a página de categorias
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => UsuariosPage()),
+              );
             },
           ),
           ListTile(
-            leading: const Icon(Icons.inventory),
-            title: const Text('Produtos'),
-            onTap: () {
-              // Implementar navegação para a página de produtos
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.logout),
+            leading: const Icon(Icons.logout, color: Colors.teal),
             title: const Text('Logout'),
-            onTap: () {
-              // Implementar lógica de logout
+            onTap: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Confirmar Logout'),
+                  content: const Text('Tem certeza que deseja sair?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancelar'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Sair'),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirm == true) {
+                Provider.of<AuthModel>(context, listen: false).logout();
+              }
             },
           ),
         ],

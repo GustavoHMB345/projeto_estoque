@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import '../consumer_api.dart';
 import '../models/produto.dart';
-import '../models/tecnico.dart';
-import '../models/setor.dart';
-import '../models/historico_produto.dart';
 
 class ProdutoDetalhesPage extends StatefulWidget {
   final Produto produto;
@@ -17,14 +14,13 @@ class ProdutoDetalhesPage extends StatefulWidget {
 
 class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
   late Produto produto;
-  List<HistoricoProduto> _historico = [];
+  final List<String> _historico = [];
 
   @override
   void initState() {
     super.initState();
     produto = widget.produto;
     _carregarProdutoAtualizado();
-    _carregarHistorico();
   }
 
   Future<Produto> fetchProdutoAtualizado() async {
@@ -48,19 +44,16 @@ class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
     }
   }
 
-  Future<void> _carregarHistorico() async {
-    try {
-      final historico = await fetchHistoricoProduto(int.parse(produto.id.toString()));
-      if (!mounted) return;
-      setState(() {
-        _historico = historico.map((item) => HistoricoProduto.fromJson(item)).toList();
-      });
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao carregar histórico: $e')),
-      );
-    }
+  void _adicionarAoHistorico(String acao) {
+    final agora = DateTime.now();
+    final dataHora = "${agora.day.toString().padLeft(2, '0')}/"
+        "${agora.month.toString().padLeft(2, '0')}/"
+        "${agora.year} - "
+        "${agora.hour.toString().padLeft(2, '0')}: "
+        "${agora.minute.toString().padLeft(2, '0')}";
+    setState(() {
+      _historico.add("$dataHora: $acao");
+    });
   }
 
   Future<void> _editarProdutoDialog() async {
@@ -103,7 +96,7 @@ class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
               child: const Text('Cancelar'),
             ),
             TextButton(
-              onPressed: () async {
+              onPressed: () {
                 final atualizado = Produto(
                   id: produto.id,
                   nome: nomeController.text.trim(),
@@ -111,33 +104,11 @@ class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
                   quantidade: int.tryParse(quantidadeController.text.trim()) ?? 0,
                   criadoEm: produto.criadoEm,
                 );
-                // Chama a API para atualizar o produto
-                bool ok = false;
-                if (widget.onProdutoEditado != null) {
-                  // Se vier da tela principal, já faz update lá
-                  await widget.onProdutoEditado!(atualizado);
-                  ok = true;
-                } else {
-                  // Atualiza diretamente aqui se não vier callback
-                  ok = await updateItem('produtos', atualizado.id, atualizado.toJson(includeDataCriacao: false));
-                  if (ok) {
-                    // Cria o primeiro histórico do produto
-                    await createItem('historico', {
-                      'idProduto': atualizado.id,
-                      'campo': 'criação',
-                      'valor_antigo': 'N/A',
-                      'valor_novo': 'Produto criado',
-                      'tecnico': 'Sistema',
-                      'setor': 'Inicial'
-                    });
-                  } else {
-                    debugPrint('Erro ao atualizar o produto diretamente no backend.');
-                  }
-                }
+                _adicionarAoHistorico("Produto editado: Nome: ${atualizado.nome}, Condição: ${atualizado.condicao}, Quantidade: ${atualizado.quantidade}");
+                setState(() {
+                  produto = atualizado;
+                });
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(ok ? 'Produto atualizado!' : 'Erro ao atualizar produto!')),
-                );
               },
               child: const Text('Salvar Alterações'),
             ),
@@ -170,46 +141,36 @@ class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const CircularProgressIndicator();
                 } else if (snapshot.hasError) {
-                  return Text('Erro ao carregar produto atualizado: \\${snapshot.error}');
+                  return Text('Erro ao carregar produto atualizado: ${snapshot.error}');
                 } else if (snapshot.hasData) {
                   final produtoAtualizado = snapshot.data!;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Nome: \\${produtoAtualizado.nome}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      Text('Condição: \\${produtoAtualizado.condicao}'),
-                      Text('Quantidade: \\${produtoAtualizado.quantidade}'),
-                      Text('Criado em: \\${produtoAtualizado.criadoEm.toLocal().day.toString().padLeft(2, '0')}-'
-                          '\\${produtoAtualizado.criadoEm.toLocal().month.toString().padLeft(2, '0')}-'
-                          '\\${produtoAtualizado.criadoEm.toLocal().year.toString().substring(2)}'),
-                      const SizedBox(height: 24),
-                      Text('Histórico de Edições:', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      _historico.isEmpty
-                          ? const Text('Nenhuma edição registrada.')
-                          : SizedBox(
-                              height: 120,
-                              child: ListView.builder(
-                                itemCount: _historico.length,
-                                itemBuilder: (context, idx) {
-                                  final h = _historico[idx];
-                                  return ListTile(
-                                    title: Text('${h.campo}: ${h.valorAntigo} -> ${h.valorNovo}'),
-                                    subtitle: Text('Técnico: ${h.tecnico} | Setor: ${h.setor}'),
-                                    trailing: Text(
-                                      '${h.dataAlteracao.day.toString().padLeft(2, '0')}/'
-                                      '${h.dataAlteracao.month.toString().padLeft(2, '0')}/'
-                                      '${h.dataAlteracao.year.toString().substring(2)}',
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
+                      Text('Nome: ${produtoAtualizado.nome}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text('Condição: ${produtoAtualizado.condicao}'),
+                      Text('Quantidade: ${produtoAtualizado.quantidade}'),
+                      Text('Criado em: ${produtoAtualizado.criadoEm.toLocal().day.toString().padLeft(2, '0')}-'
+                          '${produtoAtualizado.criadoEm.toLocal().month.toString().padLeft(2, '0')}-'
+                          '${produtoAtualizado.criadoEm.toLocal().year.toString().substring(2)}'),
                     ],
                   );
                 } else {
                   return const Text('Produto não encontrado');
                 }
               },
+            ),
+            const SizedBox(height: 16),
+            const Text('Histórico de Edição e Movimentação:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _historico.length,
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    title: Text(_historico[index]),
+                  );
+                },
+              ),
             ),
           ],
         ),
