@@ -93,7 +93,7 @@ class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
+              child: const Text('Cancelar', style: TextStyle(color: Color(0xFF007BFF))), // Cor do botão
             ),
             TextButton(
               onPressed: () {
@@ -110,7 +110,7 @@ class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
                 });
                 Navigator.pop(context);
               },
-              child: const Text('Salvar Alterações'),
+              child: const Text('Salvar Alterações', style: TextStyle(color: Color(0xFF007BFF))), // Cor do botão
             ),
           ],
         );
@@ -122,10 +122,12 @@ class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(produto.nome),
+        title: Text(produto.nome, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF007BFF), // Cor azul vibrante
+        iconTheme: const IconThemeData(color: Colors.white), // Ícones brancos
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit),
+            icon: const Icon(Icons.edit, color: Colors.white),
             onPressed: _editarProdutoDialog,
           ),
         ],
@@ -139,35 +141,47 @@ class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
               future: fetchProdutoAtualizado(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const CircularProgressIndicator();
+                  return const Center(child: CircularProgressIndicator(color: Color(0xFF007BFF)));
                 } else if (snapshot.hasError) {
-                  return Text('Erro ao carregar produto atualizado: ${snapshot.error}');
+                  return Text('Erro ao carregar produto atualizado: ${snapshot.error}', style: const TextStyle(color: Colors.red));
                 } else if (snapshot.hasData) {
                   final produtoAtualizado = snapshot.data!;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Nome: ${produtoAtualizado.nome}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      Text('Condição: ${produtoAtualizado.condicao}'),
-                      Text('Quantidade: ${produtoAtualizado.quantidade}'),
+                      Text('Nome: ${produtoAtualizado.nome}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF333333))),
+                      const SizedBox(height: 8),
+                      Text('Condição: ${produtoAtualizado.condicao}', style: const TextStyle(fontSize: 16, color: Color(0xFF555555))),
+                      const SizedBox(height: 4),
+                      Text('Quantidade: ${produtoAtualizado.quantidade}', style: const TextStyle(fontSize: 16, color: Color(0xFF555555))),
+                      const SizedBox(height: 4),
                       Text('Criado em: ${produtoAtualizado.criadoEm.toLocal().day.toString().padLeft(2, '0')}-'
                           '${produtoAtualizado.criadoEm.toLocal().month.toString().padLeft(2, '0')}-'
-                          '${produtoAtualizado.criadoEm.toLocal().year.toString().substring(2)}'),
+                          '${produtoAtualizado.criadoEm.toLocal().year.toString().substring(2)}', style: const TextStyle(fontSize: 16, color: Color(0xFF555555))),
                     ],
                   );
                 } else {
-                  return const Text('Produto não encontrado');
+                  return const Text('Produto não encontrado', style: TextStyle(color: Colors.red));
                 }
               },
             ),
-            const SizedBox(height: 16),
-            const Text('Histórico de Edição e Movimentação:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            const Text('Histórico de Edição e Movimentação:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF333333))),
+            const Divider(color: Color(0xFFDDDDDD)),
             Expanded(
-              child: ListView.builder(
+              child: _historico.isEmpty
+                  ? const Center(child: Text('Nenhum histórico disponível.', style: TextStyle(color: Color(0xFF777777))))
+                  : ListView.builder(
                 itemCount: _historico.length,
                 itemBuilder: (context, index) {
-                  return ListTile(
-                    title: Text(_historico[index]),
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 4.0),
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Text(_historico[index], style: const TextStyle(fontSize: 14, color: Color(0xFF444444))),
+                    ),
                   );
                 },
               ),

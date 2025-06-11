@@ -29,7 +29,9 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Aplicação do estoque',
       theme: ThemeData(
-        primarySwatch: Colors.grey,
+        primaryColor: const Color(0xFF007BFF), // Cor azul vibrante como primaryColor
+        hintColor: const Color(0xFFF9DC5C), // Cor amarela para realces
+        // Outras configurações de tema podem ser adicionadas aqui
       ),
       navigatorKey: navigatorKey,
       initialRoute: '/',
@@ -54,7 +56,7 @@ class MyApp extends StatelessWidget {
                 authModel.passwordController.text,
               );
             },
-            usernameController: authModel.usernameController, 
+            usernameController: authModel.usernameController,
             passwordController: authModel.passwordController,
           );
         }
@@ -72,7 +74,7 @@ class MyApp extends StatelessWidget {
               authModel.passwordController.text,
             );
           },
-          usernameController: authModel.usernameController, 
+          usernameController: authModel.usernameController,
           passwordController: authModel.passwordController,
         );
       },

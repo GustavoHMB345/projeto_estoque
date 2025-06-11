@@ -71,18 +71,28 @@ class _UsuariosPageState extends State<UsuariosPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Gerenciar Usuários'),
+        title: const Text('Gerenciar Usuários', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF007BFF), // Cor azul vibrante
+        iconTheme: const IconThemeData(color: Colors.white), // Ícones brancos
       ),
-      body: ListView.builder(
+      body: _usuarios.isEmpty
+          ? const Center(child: Text('Nenhum usuário encontrado.'))
+          : ListView.builder(
         itemCount: _usuarios.length,
         itemBuilder: (context, index) {
           final usuario = _usuarios[index];
-          return ListTile(
-            title: Text(usuario['nomeUsuario'] ?? 'Nome não disponível'),
-            subtitle: Text(usuario['emailUsuario'] ?? 'Email não disponível'),
-            trailing: IconButton(
-              icon: Icon(Icons.delete),
-              onPressed: () => _excluirUsuario(usuario['idUsuario']?.toString() ?? ''),
+          return Card(
+            margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+            elevation: 3,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+            child: ListTile(
+              contentPadding: const EdgeInsets.all(12.0),
+              title: Text(usuario['nomeUsuario'] ?? 'Nome não disponível', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF333333))),
+              subtitle: Text(usuario['emailUsuario'] ?? 'Email não disponível', style: const TextStyle(fontSize: 14, color: Color(0xFF555555))),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete, color: Color(0xFFDC3545)), // Cor do ícone de exclusão
+                onPressed: () => _excluirUsuario(usuario['idUsuario']?.toString() ?? ''),
+              ),
             ),
           );
         },
@@ -92,7 +102,7 @@ class _UsuariosPageState extends State<UsuariosPage> {
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
-              title: Text('Adicionar Usuário'),
+              title: const Text('Adicionar Usuário', style: TextStyle(color: Color(0xFF333333))),
               content: Form(
                 key: _formKey,
                 child: Column(
@@ -100,22 +110,22 @@ class _UsuariosPageState extends State<UsuariosPage> {
                   children: [
                     TextFormField(
                       controller: _nomeController,
-                      decoration: InputDecoration(labelText: 'Nome'),
+                      decoration: const InputDecoration(labelText: 'Nome'),
                       validator: (value) => value!.isEmpty ? 'Campo obrigatório' : null,
                     ),
                     TextFormField(
                       controller: _emailController,
-                      decoration: InputDecoration(labelText: 'Email'),
+                      decoration: const InputDecoration(labelText: 'Email'),
                       validator: (value) => value!.isEmpty ? 'Campo obrigatório' : null,
                     ),
                     TextFormField(
                       controller: _loginController,
-                      decoration: InputDecoration(labelText: 'Login'),
+                      decoration: const InputDecoration(labelText: 'Login'),
                       validator: (value) => value!.isEmpty ? 'Campo obrigatório' : null,
                     ),
                     TextFormField(
                       controller: _senhaController,
-                      decoration: InputDecoration(labelText: 'Senha'),
+                      decoration: const InputDecoration(labelText: 'Senha'),
                       obscureText: true,
                       validator: (value) => value!.isEmpty ? 'Campo obrigatório' : null,
                     ),
@@ -125,17 +135,22 @@ class _UsuariosPageState extends State<UsuariosPage> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text('Cancelar'),
+                  child: const Text('Cancelar', style: TextStyle(color: Color(0xFF555555))),
                 ),
                 ElevatedButton(
                   onPressed: _adicionarUsuario,
-                  child: Text('Adicionar'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF007BFF), // Cor azul vibrante
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Adicionar'),
                 ),
               ],
             ),
           );
         },
-        child: Icon(Icons.add),
+        backgroundColor: const Color(0xFF007BFF), // Cor azul vibrante
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }

@@ -20,17 +20,20 @@ class AuthPage extends StatelessWidget {
       body: Stack(
         fit: StackFit.expand,
         children: <Widget>[
+          // Imagem de fundo ajustada para cobrir toda a tela
           Image.network(
-            'https://www.designi.com.br/images/preview/10532917.jpg',
+            'https://brightbee.com.br/wp-content/uploads/2022/10/banner-bright-bee.png', // Nova imagem de fundo do site
             fit: BoxFit.cover,
           ),
+          // Logo posicionado no topo, centralizado
           Positioned(
-            top: 100,
-            left: 100,
-            right: 100,
+            top: MediaQuery.of(context).size.height * 0.1, // Ajuste a posição conforme necessário
+            left: 0,
+            right: 0,
             child: Center(
               child: Image.network(
                 'https://brightbee.com.br/wp-content/uploads/2022/10/logo-bright-bee.png',
+                width: 200, // Ajuste o tamanho da logo
               ),
             ),
           ),
@@ -42,18 +45,20 @@ class AuthPage extends StatelessWidget {
                   return Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
+                      // Adicionado um espaço para mover os campos de login para cima
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.1),
                       _buildTextInput(
                         controller: usernameController,
-                        label: 'Username',
+                        label: 'Nome de Usuário', // Alterado label para "Nome de Usuário"
                         obscureText: false,
                       ),
-                      const SizedBox(height: 10.0),
+                      const SizedBox(height: 15.0), // Aumentado espaço entre campos
                       _buildTextInput(
                         controller: passwordController,
-                        label: 'Password',
+                        label: 'Senha', // Alterado label para "Senha"
                         obscureText: true,
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 20), // Aumentado espaço antes do botão
                       _buildLoginButton(
                         context: context,
                         authModel: authModel,
@@ -75,20 +80,28 @@ class AuthPage extends StatelessWidget {
     required bool obscureText,
   }) {
     return Container(
-      height: 60.0,
-      width: 500.0,
+      height: 55.0, // Ajustado altura do campo
+      width: 300.0, // Ajustado largura do campo para ser mais responsivo, ou pode ser um valor fixo
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8.0),
-        border: Border.all(color: Colors.brown, width: 2.0),
+        color: Colors.white.withOpacity(0.9), // Levemente transparente
+        borderRadius: BorderRadius.circular(30.0), // Borda mais arredondada
+        border: Border.all(color: const Color(0xFFF9DC5C), width: 2.0), // Cor da borda amarela do site
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: const Offset(0, 3), // Sombra suave
+          ),
+        ],
       ),
       child: TextField(
         controller: controller,
         decoration: InputDecoration(
           labelText: label,
-          border: InputBorder.none,
-          labelStyle: const TextStyle(color: Colors.brown),
-          contentPadding: const EdgeInsets.all(8.0),
+          border: InputBorder.none, // Remove a borda interna do TextField
+          labelStyle: const TextStyle(color: Color(0xFF5D5D5D)), // Cor do texto do label
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 15.0), // Ajuste do padding
         ),
         obscureText: obscureText,
         style: const TextStyle(color: Colors.black),
@@ -109,10 +122,21 @@ class AuthPage extends StatelessWidget {
         }
       },
       style: ElevatedButton.styleFrom(
-        backgroundColor: const Color.fromARGB(255, 218, 206, 96),
-        foregroundColor: Colors.brown,
+        backgroundColor: const Color(0xFFF9DC5C), // Cor amarela do site
+        foregroundColor: const Color(0xFF5D5D5D), // Cor do texto do botão
+        padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15), // Ajuste do padding do botão
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30.0), // Borda mais arredondada
+        ),
+        elevation: 5, // Sombra para o botão
       ),
-      child: const Text('Login'),
+      child: const Text(
+        'ENTRAR', // Texto em maiúsculas
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 }
