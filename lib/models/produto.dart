@@ -1,9 +1,12 @@
+import 'categoria.dart';
+
 class Produto {
   final String id;
   final String nome;
   final String condicao;
   final int quantidade;
   final DateTime criadoEm;
+  final String? categoriaId;
 
   Produto({
     required this.id,
@@ -11,6 +14,7 @@ class Produto {
     required this.condicao,
     required this.quantidade,
     required this.criadoEm,
+    this.categoriaId,
   });
 
   factory Produto.fromJson(Map<String, dynamic> json) {
@@ -20,20 +24,18 @@ class Produto {
       condicao: json['condicao'] ?? '',
       quantidade: int.tryParse(json['quantidade'].toString()) ?? 0,
       criadoEm: DateTime.parse(json['data_criacao'] ?? DateTime.now().toIso8601String()),
-      
+      categoriaId: json['categoria_id'],
     );
   }
 
   Map<String, dynamic> toJson({bool includeDataCriacao = true}) {
-    final map = {
+    return {
       'id': id,
       'nome': nome,
       'condicao': condicao,
       'quantidade': quantidade,
+      'categoria_id': categoriaId,
+      if (includeDataCriacao) 'data_criacao': criadoEm.toIso8601String(),
     };
-    if (includeDataCriacao) {
-      map['data_criacao'] = criadoEm.toIso8601String();
-    }
-    return map;
   }
 }

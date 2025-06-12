@@ -19,21 +19,21 @@ class AuthPage extends StatelessWidget {
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
-        children: <Widget>[
+        children: [
           // Imagem de fundo ajustada para cobrir toda a tela
-          Image.network(
-            'https://brightbee.com.br/wp-content/uploads/2022/10/banner-bright-bee.png', // Nova imagem de fundo do site
+          Image.asset(
+            'lib/images/fundo.jpg', // Imagem local de fundo
             fit: BoxFit.cover,
           ),
-          // Logo posicionado no topo, centralizado
+          
           Positioned(
-            top: MediaQuery.of(context).size.height * 0.1, // Ajuste a posição conforme necessário
+            top: MediaQuery.of(context).size.height * 0.16, // Centraliza melhor
             left: 0,
             right: 0,
             child: Center(
-              child: Image.network(
-                'https://brightbee.com.br/wp-content/uploads/2022/10/logo-bright-bee.png',
-                width: 200, // Ajuste o tamanho da logo
+              child: Image.asset(
+                'lib/images/Marca_Bright_Bee_(Gradiente_Horizontal_Positivo).png',
+                height: 150,
               ),
             ),
           ),
@@ -45,20 +45,19 @@ class AuthPage extends StatelessWidget {
                   return Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      // Adicionado um espaço para mover os campos de login para cima
                       SizedBox(height: MediaQuery.of(context).size.height * 0.1),
                       _buildTextInput(
                         controller: usernameController,
-                        label: 'Nome de Usuário', // Alterado label para "Nome de Usuário"
+                        label: 'Nome de Usuário',
                         obscureText: false,
                       ),
-                      const SizedBox(height: 15.0), // Aumentado espaço entre campos
+                      const SizedBox(height: 15.0),
                       _buildTextInput(
                         controller: passwordController,
-                        label: 'Senha', // Alterado label para "Senha"
+                        label: 'Senha',
                         obscureText: true,
                       ),
-                      const SizedBox(height: 20), // Aumentado espaço antes do botão
+                      const SizedBox(height: 20),
                       _buildLoginButton(
                         context: context,
                         authModel: authModel,

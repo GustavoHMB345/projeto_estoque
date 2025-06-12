@@ -63,13 +63,15 @@ class AuthModel with ChangeNotifier {
 }
 
 class Usuario {
+  final String idUsuario; // Adicionar o ID do usuário
   final String email;
   final String nome;
 
-  Usuario({required this.email, required this.nome});
+  Usuario({required this.idUsuario, required this.email, required this.nome}); // Atualizar construtor
 
   factory Usuario.fromJson(Map<String, dynamic> json) {
     return Usuario(
+      idUsuario: json['idUsuario']?.toString() ?? '', // Obter idUsuario e converter para String
       email: json['emailUsuario'] ?? '',
       nome: json['nomeUsuario'] ?? 'Usuário',
     );

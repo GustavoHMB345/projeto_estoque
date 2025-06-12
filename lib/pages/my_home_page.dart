@@ -3,17 +3,18 @@ import 'package:projeto_estoque/pages/produto_detalhes_page.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_model.dart';
 import '../providers/app_state.dart';
-import '../consumer_api.dart';
+import '../consumer_api.dart' as api; // CORREÇÃO: Importa o consumer_api com prefixo 'api'
 import '../models/produto.dart';
+import '../models/categoria.dart'; // Importa o modelo Categoria
 import 'package:logging/logging.dart';
-import 'dart:async'; // Importar para usar Timer
-
+import 'dart:async';  
 import 'usuarios_page.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
 
   @override
+  // CORREÇÃO: Removido o 'State' duplicado aqui. Deve ser '_MyHomePageState()'
   MyHomePageState createState() => MyHomePageState();
 }
 
@@ -21,11 +22,16 @@ class MyHomePageState extends State<MyHomePage> {
   final _textController = TextEditingController();
   late AppState _appState;
   final _logger = Logger('MyHomePage');
-  Timer? _debounce; // Adicionar um Timer para o debounce
+  Timer? _debounce;
+
+  List<Categoria> _categorias = [];
+  bool _carregandoCategorias = false;
+  String? _categoriaFiltroSelecionada; // Agora começa como null
 
   @override
   void initState() {
     super.initState();
+    _carregarCategorias();
   }
 
   @override
@@ -40,11 +46,12 @@ class MyHomePageState extends State<MyHomePage> {
   void dispose() {
     _appState.removeListener(_updateDataFromApi);
     _textController.dispose();
-    _debounce?.cancel(); // Cancelar o timer no dispose
+    _debounce?.cancel();
     super.dispose();
   }
 
   void _updateDataFromApi() {
+    if (!mounted) return;
     setState(() {
       // Força a reconstrução da UI quando os dados da API são atualizados via AppState
     });
@@ -60,81 +67,130 @@ class MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _adicionarProduto() async {
+    // Garante que as categorias estejam atualizadas antes de abrir o diálogo
+    await _carregarCategorias();
+
     final nomeController = TextEditingController();
     final quantidadeController = TextEditingController();
     final condicaoController = TextEditingController(text: 'novo');
+    // Use sempre o estado local _categorias, que está atualizado
+    final categorias = _categorias;
+    String? categoriaSelecionada = categorias.isNotEmpty ? categorias.first.id : null;
 
     if (!mounted) return;
     await showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Adicionar Produto'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nomeController,
-                decoration: const InputDecoration(labelText: 'Nome do Produto'),
-              ),
-              TextField(
-                controller: quantidadeController,
-                decoration: const InputDecoration(labelText: 'Quantidade'),
-                keyboardType: TextInputType.number,
-              ),
-              DropdownButtonFormField<String>(
-                value: condicaoController.text,
-                items: const [
-                  DropdownMenuItem(value: 'novo', child: Text('Novo')),
-                  DropdownMenuItem(value: 'usado', child: Text('Usado')),
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            // Corrige valor inicial se categorias mudaram
+            if (categorias.isNotEmpty && (categoriaSelecionada == null || !categorias.any((c) => c.id == categoriaSelecionada))) {
+              categoriaSelecionada = categorias.first.id;
+            }
+            return AlertDialog(
+              title: const Text('Adicionar Produto'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nomeController,
+                    decoration: const InputDecoration(labelText: 'Nome do Produto'),
+                  ),
+                  DropdownButtonFormField<String>(
+                    value: categoriaSelecionada,
+                    items: categorias.isNotEmpty
+                        ? categorias.map((c) => DropdownMenuItem(value: c.id, child: Text(c.nome))).toList()
+                        : [const DropdownMenuItem(value: null, child: Text('Sem categorias'))],
+                    onChanged: categorias.isNotEmpty
+                        ? (value) {
+                            setStateDialog(() {
+                              categoriaSelecionada = value;
+                            });
+                          }
+                        : null,
+                    decoration: const InputDecoration(labelText: 'Categoria'),
+                    isExpanded: true,
+                    disabledHint: const Text('Cadastre uma categoria primeiro'),
+                  ),
+                  TextField(
+                    controller: quantidadeController,
+                    decoration: const InputDecoration(labelText: 'Quantidade'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  DropdownButtonFormField<String>(
+                    value: condicaoController.text,
+                    items: const [
+                      DropdownMenuItem(value: 'novo', child: Text('Novo')),
+                      DropdownMenuItem(value: 'usado', child: Text('Usado')),
+                    ],
+                    onChanged: (value) => condicaoController.text = value ?? 'novo',
+                    decoration: const InputDecoration(labelText: 'Condição'),
+                  ),
                 ],
-                onChanged: (value) => condicaoController.text = value ?? 'novo',
-                decoration: const InputDecoration(labelText: 'Condição'),
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () async {
-                final produto = Produto(
-                  id: '',
-                  nome: nomeController.text.trim(),
-                  condicao: condicaoController.text,
-                  quantidade: int.tryParse(quantidadeController.text.trim()) ?? 0,
-                  criadoEm: DateTime.now(),
-                );
-                final response = await createItem('produtos', produto.toJson());
-                if (!mounted) return;
-                if (response) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Produto criado com sucesso!')),
-                  );
-                  Navigator.pop(context);
-                  // Registrar movimentação de entrada
-                  final authModel = Provider.of<AuthModel>(context, listen: false);
-                  await createMovimentacao({
-                    'produto_id': produto.id, // O ID do produto recém-criado pode não ser retornado pela API, verificar
-                    'tipo': 'entrada',
-                    'quantidade': produto.quantidade,
-                    'usuario_id': authModel.usuario?.id,
-                    'data_hora': DateTime.now().toIso8601String(),
-                    'observacao': 'Produto adicionado ao estoque',
-                  });
-                  _updateDataFromApi(); // Atualiza a dashboard e lista
-                } else {
-                  _logger.severe('Erro ao salvar o produto. Verifique os dados enviados e a conexão com a API.');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Erro ao criar produto: Verifique os dados e tente novamente.')),
-                  );
-                }
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                TextButton(
+                  onPressed: categorias.isEmpty
+                      ? null
+                      : () async {
+                          final produto = Produto(
+                            id: '',
+                            nome: nomeController.text.trim(),
+                            condicao: condicaoController.text,
+                            quantidade: int.tryParse(quantidadeController.text.trim()) ?? 0,
+                            criadoEm: DateTime.now(),
+                            categoriaId: categoriaSelecionada,
+                          );
+                          final response = await api.createItem('produtos', produto.toJson());
+                          if (!mounted) return;
+                          if (response is Map) {
+                            final map = response as Map;
+                            if (map['id'] != null) {
+                              final novoId = map['id'];
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Produto criado com sucesso!')),
+                              );
+                              Navigator.pop(context);
+                              final authModel = Provider.of<AuthModel>(context, listen: false);
+                              await api.createMovimentacao({
+                                'produto_id': novoId,
+                                'tipo': 'entrada',
+                                'quantidade': produto.quantidade,
+                                'usuario_id': authModel.usuario?.idUsuario,
+                                'data_hora': DateTime.now().toIso8601String(),
+                                'observacao': 'Produto adicionado ao estoque',
+                              });
+                              await _appState.carregarProdutosDaApi();
+                            } else if (map['message'] != null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Erro ao criar produto: \x1B[31m${map['message']}\x1B[0m')),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Erro ao criar produto: Verifique os dados e tente novamente.')),
+                              );
+                            }
+                          } else if (response == true) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Produto criado com sucesso!')),
+                            );
+                            Navigator.pop(context);
+                            await _appState.carregarProdutosDaApi();
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Erro ao criar produto: Verifique os dados e tente novamente.')),
+                            );
+                          }
+                        },
+                  child: const Text('Salvar'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -144,95 +200,119 @@ class MyHomePageState extends State<MyHomePage> {
     final nomeController = TextEditingController(text: produto.nome);
     final quantidadeController = TextEditingController(text: produto.quantidade.toString());
     final condicaoController = TextEditingController(text: produto.condicao);
-    final quantidadeAntiga = produto.quantidade; // Salva a quantidade antiga
+    final quantidadeAntiga = produto.quantidade;
+    String? categoriaSelecionada = produto.categoriaId ?? (_categorias.isNotEmpty ? _categorias.first.id : null);
 
     if (!mounted) return;
     await showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Editar Produto'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nomeController,
-                decoration: const InputDecoration(labelText: 'Nome do Produto'),
-              ),
-              TextField(
-                controller: quantidadeController,
-                decoration: const InputDecoration(labelText: 'Quantidade'),
-                keyboardType: TextInputType.number,
-              ),
-              DropdownButtonFormField<String>(
-                value: condicaoController.text,
-                items: const [
-                  DropdownMenuItem(value: 'novo', child: Text('Novo')),
-                  DropdownMenuItem(value: 'usado', child: Text('Usado')),
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            // Corrige valor inicial se categorias mudaram
+            if (_categorias.isNotEmpty && (categoriaSelecionada == null || !_categorias.any((c) => c.id == categoriaSelecionada))) {
+              categoriaSelecionada = _categorias.first.id;
+            }
+            return AlertDialog(
+              title: const Text('Editar Produto'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nomeController,
+                    decoration: const InputDecoration(labelText: 'Nome do Produto'),
+                  ),
+                  DropdownButtonFormField<String>(
+                    value: categoriaSelecionada,
+                    items: _categorias.isNotEmpty
+                        ? _categorias.map((c) => DropdownMenuItem(value: c.id, child: Text(c.nome))).toList()
+                        : [const DropdownMenuItem(value: null, child: Text('Sem categorias'))],
+                    onChanged: _categorias.isNotEmpty
+                        ? (value) {
+                            setStateDialog(() {
+                              categoriaSelecionada = value;
+                            });
+                          }
+                        : null,
+                    decoration: const InputDecoration(labelText: 'Categoria'),
+                    isExpanded: true,
+                    disabledHint: const Text('Cadastre uma categoria primeiro'),
+                  ),
+                  TextField(
+                    controller: quantidadeController,
+                    decoration: const InputDecoration(labelText: 'Quantidade'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  DropdownButtonFormField<String>(
+                    value: condicaoController.text,
+                    items: const [
+                      DropdownMenuItem(value: 'novo', child: Text('Novo')),
+                      DropdownMenuItem(value: 'usado', child: Text('Usado')),
+                    ],
+                    onChanged: (value) => condicaoController.text = value ?? 'novo',
+                    decoration: const InputDecoration(labelText: 'Condição'),
+                  ),
                 ],
-                onChanged: (value) => condicaoController.text = value ?? 'novo',
-                decoration: const InputDecoration(labelText: 'Condição'),
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () async {
-                final novaQuantidade = int.tryParse(quantidadeController.text.trim()) ?? 0;
-                final atualizado = Produto(
-                  id: produto.id,
-                  nome: nomeController.text.trim(),
-                  condicao: condicaoController.text,
-                  quantidade: novaQuantidade,
-                  criadoEm: produto.criadoEm,
-                );
-                final response = await updateItem('produtos', produto.id, atualizado.toJson(includeDataCriacao: false));
-                if (!mounted) return;
-                if (response) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Produto atualizado com sucesso!')),
-                  );
-                  Navigator.pop(context);
-                  // Registrar movimentação de edição/ajuste
-                  final authModel = Provider.of<AuthModel>(context, listen: false);
-                  if (novaQuantidade != quantidadeAntiga) {
-                    final tipoMov = novaQuantidade > quantidadeAntiga ? 'entrada' : 'saida';
-                    final qtdMov = (novaQuantidade - quantidadeAntiga).abs();
-                    await createMovimentacao({
-                      'produto_id': produto.id,
-                      'tipo': tipoMov,
-                      'quantidade': qtdMov,
-                      'usuario_id': authModel.usuario?.id,
-                      'data_hora': DateTime.now().toIso8601String(),
-                      'observacao': 'Ajuste de quantidade por edição (de $quantidadeAntiga para $novaQuantidade)',
-                    });
-                  }
-                  // Registrar edição geral (mesmo sem mudança de quantidade, mas com outros campos)
-                  await createMovimentacao({
-                    'produto_id': produto.id,
-                    'tipo': 'edicao',
-                    'quantidade': 0, // Não há mudança de quantidade líquida aqui
-                    'usuario_id': authModel.usuario?.id,
-                    'data_hora': DateTime.now().toIso8601String(),
-                    'observacao': 'Detalhes do produto editados',
-                  });
-                  _updateDataFromApi(); // Atualiza a dashboard e lista
-                } else {
-                  _logger.severe('Erro ao atualizar o produto. Verifique os dados enviados e a conexão com a API.');
-                  // ignore: avoid_print
-                  print('[ERRO] Falha ao atualizar produto: ${atualizado.toJson()}');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Erro ao atualizar produto: Verifique os dados e tente novamente.')),
-                  );
-                }
-              },
-              child: const Text('Salvar Alterações'),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                TextButton(
+                  onPressed: _categorias.isEmpty
+                      ? null
+                      : () async {
+                          final novaQuantidade = int.tryParse(quantidadeController.text.trim()) ?? 0;
+                          final atualizado = Produto(
+                            id: produto.id,
+                            nome: nomeController.text.trim(),
+                            condicao: condicaoController.text,
+                            quantidade: novaQuantidade,
+                            criadoEm: produto.criadoEm,
+                            categoriaId: categoriaSelecionada,
+                          );
+                          final response = await api.updateItem('produtos', produto.id, atualizado.toJson(includeDataCriacao: false));
+                          if (!mounted) return;
+                          if (response) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Produto atualizado com sucesso!')),
+                            );
+                            Navigator.pop(context);
+                            final authModel = Provider.of<AuthModel>(context, listen: false);
+                            if (novaQuantidade != quantidadeAntiga) {
+                              final tipoMov = novaQuantidade > quantidadeAntiga ? 'entrada' : 'saida';
+                              final qtdMov = (novaQuantidade - quantidadeAntiga).abs();
+                              await api.createMovimentacao({
+                                'produto_id': produto.id,
+                                'tipo': tipoMov,
+                                'quantidade': qtdMov,
+                                'usuario_id': authModel.usuario?.idUsuario,
+                                'data_hora': DateTime.now().toIso8601String(),
+                                'observacao': 'Ajuste de quantidade por edição (de $quantidadeAntiga para $novaQuantidade)',
+                              });
+                            }
+                            await api.createMovimentacao({
+                              'produto_id': produto.id,
+                              'tipo': 'edicao',
+                              'quantidade': 0,
+                              'usuario_id': authModel.usuario?.idUsuario,
+                              'data_hora': DateTime.now().toIso8601String(),
+                              'observacao': 'Detalhes do produto editados',
+                            });
+                            await _appState.carregarProdutosDaApi();
+                          } else {
+                            _logger.severe('Erro ao atualizar o produto. Verifique os dados enviados e a conexão com a API.');
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Erro ao atualizar produto: Verifique os dados e tente novamente.')),
+                            );
+                          }
+                        },
+                  child: const Text('Salvar Alterações'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -258,29 +338,149 @@ class MyHomePageState extends State<MyHomePage> {
     );
 
     if (confirm == true) {
-      final response = await deleteItem('produtos', id);
-      if (!mounted) return;
-      if (response) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Produto excluído com sucesso!')),
-        );
-        // Registrar movimentação de exclusão
+      try {
+        // Registrar movimentação de exclusão ANTES de excluir o produto
         final authModel = Provider.of<AuthModel>(context, listen: false);
-        await createMovimentacao({
+        await api.createMovimentacao({
           'produto_id': id,
           'tipo': 'exclusao',
           'quantidade': 0, // Não há mudança de quantidade, apenas registro da exclusão
-          'usuario_id': authModel.usuario?.id,
+          'usuario_id': authModel.usuario?.idUsuario, // Usar idUsuario
           'data_hora': DateTime.now().toIso8601String(),
           'observacao': 'Produto removido permanentemente do estoque',
         });
-        _updateDataFromApi(); // Atualiza a dashboard e lista
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao excluir produto. Tente novamente.')),
-        );
+
+        final response = await api.deleteItem('produtos', id); // CORREÇÃO: Usar api.deleteItem
+        if (!mounted) return;
+        if (response) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Produto excluído com sucesso!')),
+          );
+          _updateDataFromApi(); // Atualiza a dashboard e lista
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Erro ao excluir produto. Tente novamente.')),
+          );
+        }
+      } catch (e) {
+        String msg = e.toString();
+        if (msg.contains('404') && msg.contains('Produto não encontrado')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Produto já foi removido ou não existe.')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao excluir produto: $e')),
+          );
+        }
       }
     }
+  }
+
+  Future<void> _carregarCategorias() async {
+    setState(() {
+      _carregandoCategorias = true;
+    });
+    try {
+      final dados = await api.fetchDados('categorias');
+      final novasCategorias = dados.map<Categoria>((json) => Categoria.fromJson(json)).toList();
+      print('Categorias carregadas: \n' + novasCategorias.map((c) => 'id: \${c.id}, nome: \${c.nome}').join(', '));
+      setState(() {
+        _categorias = novasCategorias;
+        // Corrige o valor do filtro se a categoria selecionada não existir mais
+        if (_categorias.isEmpty) {
+          _categoriaFiltroSelecionada = null;
+        } else if (_categoriaFiltroSelecionada != null && !_categorias.any((c) => c.id == _categoriaFiltroSelecionada)) {
+          _categoriaFiltroSelecionada = null;
+        }
+      });
+      // Atualiza o Provider global
+      _appState.setCategorias(novasCategorias);
+    } catch (e) {
+      setState(() {
+        _categorias = [];
+        _categoriaFiltroSelecionada = null;
+      });
+      _appState.setCategorias([]);
+    } finally {
+      setState(() {
+        _carregandoCategorias = false;
+      });
+    }
+  }
+
+  Future<void> _criarCategoria() async {
+    final nomeController = TextEditingController();
+    final authModel = Provider.of<AuthModel>(context, listen: false);
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Nova Categoria'),
+          content: TextField(
+            controller: nomeController,
+            decoration: const InputDecoration(labelText: 'Nome da Categoria'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final nome = nomeController.text.trim();
+                if (nome.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('O nome da categoria não pode ser vazio.')),
+                  );
+                  return;
+                }
+                try {
+                  final dynamic ok = await api.createItem('categorias', {'nome': nome});
+                  if (ok == true || (ok is Map && ok['id'] != null)) {
+                    Navigator.pop(context);
+                    await _carregarCategorias();
+                    setState(() {}); // Força rebuild dos Dropdowns
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Categoria criada com sucesso!')),
+                    );
+                  } else if (ok is Map) {
+                    final Map<String, dynamic> okMap = ok as Map<String, dynamic>;
+                    String? errorMessage;
+                    if (okMap.containsKey('message') && okMap['message'] != null) {
+                      errorMessage = okMap['message'].toString();
+                    } else if (okMap.containsKey('error') && okMap['error'] != null) {
+                      errorMessage = okMap['error'].toString();
+                    }
+                    if (errorMessage != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(errorMessage)),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Erro ao criar categoria: Resposta inesperada da API.')),
+                      );
+                    }
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Erro ao criar categoria. Verifique se o nome já existe ou tente novamente.')),
+                    );
+                  }
+                } catch (e, stack) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Erro ao criar categoria: $e')),
+                  );
+                  print('Erro ao criar categoria:');
+                  print(e);
+                  print(stack);
+                }
+              },
+              child: const Text('Salvar'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -323,120 +523,108 @@ class MyHomePageState extends State<MyHomePage> {
 
   Widget _buildSidebar(BuildContext context) {
     final authModel = Provider.of<AuthModel>(context, listen: false);
+    final appState = Provider.of<AppState>(context);
     final emailUsuario = authModel.usuario?.email ?? 'email@exemplo.com';
     final nomeUsuario = authModel.usuario?.nome ?? 'Usuário';
 
-    // Calcula o total de produtos e produtos em estoque baixo e total de categorias únicas
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: fetchDados('produtos'),
-      builder: (context, snapshot) {
-        int totalProdutos = 0;
-        int estoqueBaixo = 0;
-        Set<String> categoriasUnicas = {};
+    // Calcula o total de produtos, estoque baixo e categorias únicas usando AppState
+    final produtos = appState.produtos;
+    int totalProdutos = produtos.length;
+    int estoqueBaixo = produtos.where((p) => p.quantidade <= 10).length;
+    Set<String> categoriasUnicas = produtos.map((p) => p.categoriaId ?? '').where((id) => id.isNotEmpty).toSet();
+    int totalCategorias = categoriasUnicas.length;
 
-        if (snapshot.hasData) {
-          final produtos = snapshot.data?.map((json) => Produto.fromJson(json)).toList() ?? [];
-          totalProdutos = produtos.length;
-          estoqueBaixo = produtos.where((p) => p.quantidade <= 10).length;
-          for (var p in produtos) {
-            categoriasUnicas.add(p.condicao);
-          }
-        }
-        int totalCategorias = categoriasUnicas.length;
-
-        return Container(
-          width: 250,
-          color: const Color(0xFF4F3C34),
-          child: Column(
-            children: [
-              // Header do Sidebar
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 20.0),
-                alignment: Alignment.center,
-                child: const Text(
-                  'EstoqueControl',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+    return Container(
+      width: 250,
+      color: const Color(0xFF4F3C34),
+      child: Column(
+        children: [
+          // Header do Sidebar
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 20.0),
+            alignment: Alignment.center,
+            child: const Text(
+              'EstoqueControl',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              children: [
+                _buildSidebarItem(Icons.dashboard, 'Dashboard', () {
+                  // Já está na dashboard, nada a fazer
+                }),
+                _buildSidebarItem(Icons.inventory, 'Produtos', () {
+                  // Nada a fazer, já está na seção de produtos/dashboard
+                }),
+                const Divider(color: Colors.white54),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Resumo do Estoque',
+                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 10),
+                      _buildSummaryText('Total de Produtos: $totalProdutos'),
+                      _buildSummaryText('Categorias: $totalCategorias'),
+                      _buildSummaryText('Estoque Baixo: $estoqueBaixo', color: Colors.orange),
+                    ],
                   ),
                 ),
-              ),
-              Expanded(
-                child: ListView(
-                  children: [
-                    _buildSidebarItem(Icons.dashboard, 'Dashboard', () {
-                      // Já está na dashboard, nada a fazer
-                    }),
-                    _buildSidebarItem(Icons.inventory, 'Produtos', () {
-                      // Nada a fazer, já está na seção de produtos/dashboard
-                    }),
-                    const Divider(color: Colors.white54),
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Resumo do Estoque',
-                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ],
+            ),
+          ),
+          // Parte inferior com informações do usuário e logout
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Colors.white,
+                    child: Icon(Icons.person, color: Color(0xFF4F3C34)),
+                  ),
+                  title: Text(nomeUsuario, style: const TextStyle(color: Colors.white, fontSize: 16)),
+                  subtitle: Text(emailUsuario, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.logout, color: Colors.white),
+                  title: const Text('Logout', style: TextStyle(color: Colors.white)),
+                  onTap: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Confirmar Logout'),
+                        content: const Text('Tem certeza que deseja sair?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancelar'),
                           ),
-                          const SizedBox(height: 10),
-                          _buildSummaryText('Total de Produtos: $totalProdutos'),
-                          _buildSummaryText('Categorias: $totalCategorias'),
-                          _buildSummaryText('Estoque Baixo: $estoqueBaixo', color: Colors.orange),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Sair'),
+                          ),
                         ],
                       ),
-                    ),
-                  ],
+                    );
+                    if (confirm == true) {
+                      authModel.logout();
+                    }
+                  },
                 ),
-              ),
-              // Parte inferior com informações do usuário e logout
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    ListTile(
-                      leading: const CircleAvatar(
-                        backgroundColor: Colors.white,
-                        child: Icon(Icons.person, color: Color(0xFF4F3C34)),
-                      ),
-                      title: Text(nomeUsuario, style: const TextStyle(color: Colors.white, fontSize: 16)),
-                      subtitle: Text(emailUsuario, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.logout, color: Colors.white),
-                      title: const Text('Logout', style: TextStyle(color: Colors.white)),
-                      onTap: () async {
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Confirmar Logout'),
-                            content: const Text('Tem certeza que deseja sair?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancelar'),
-                              ),
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: const Text('Sair'),
-                              ),
-                            ],
-                          ),
-                        );
-                        if (confirm == true) {
-                          authModel.logout();
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -478,78 +666,51 @@ class MyHomePageState extends State<MyHomePage> {
   }
 
   Widget _buildDashboardSummaryCards() {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: fetchDados('produtos'),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return Text('Erro ao carregar dados: ${snapshot.error}');
-        } else if (snapshot.hasData) {
-          final produtos = snapshot.data?.map((json) => Produto.fromJson(json)).toList() ?? [];
+    final appState = Provider.of<AppState>(context);
+    final produtos = appState.produtos;
+    int totalEmEstoque = produtos.fold(0, (sum, p) => sum + p.quantidade);
+    int estoqueBaixo = produtos.where((p) => p.quantidade <= 10).length;
 
-          // Calcula os valores para os cards
-          int totalEmEstoque = 0;
-          int estoqueBaixo = 0;
-          int movimentacoes = 0; // Vai ser preenchido pela API
-
-          for (var p in produtos) {
-            totalEmEstoque += p.quantidade;
-            if (p.quantidade <= 10) {
-              estoqueBaixo++;
-            }
-          }
-
-          return FutureBuilder<int>(
-            future: fetchMovimentacoesHoje(), // Buscar movimentações de hoje
-            builder: (context, movSnapshot) {
-              if (movSnapshot.connectionState == ConnectionState.waiting) {
-                movimentacoes = 0; // Ou um valor temporário
-              } else if (movSnapshot.hasData) {
-                movimentacoes = movSnapshot.data!;
-              } else if (movSnapshot.hasError) {
-                _logger.severe('Erro ao carregar movimentações de hoje: ${movSnapshot.error}');
-                movimentacoes = 0;
-              }
-
-              return GridView.count(
-                crossAxisCount: 3, // Ajustado para 3 colunas, pois uma será removida
-                crossAxisSpacing: 15,
-                mainAxisSpacing: 15,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _buildSummaryCard(
-                    context,
-                    title: 'Total em Estoque',
-                    value: totalEmEstoque.toString(),
-                    icon: Icons.inventory_2,
-                    trend: '5.3% desde o mês passado', // Manter como exemplo
-                    iconBgColor: Colors.orange,
-                  ),
-                  // Card de 'Valor do Estoque' removido
-                  _buildSummaryCard(
-                    context,
-                    title: 'Estoque Baixo',
-                    value: estoqueBaixo.toString(),
-                    icon: Icons.warning_amber,
-                    trend: '3 itens a mais que ontem', // Manter como exemplo
-                    iconBgColor: Colors.red,
-                  ),
-                  _buildSummaryCard(
-                    context,
-                    title: 'Movimentações',
-                    value: movimentacoes.toString(),
-                    icon: Icons.swap_vert,
-                    trend: 'Hoje',
-                    iconBgColor: Colors.green,
-                  ),
-                ],
-              );
-            },
-          );
+    return FutureBuilder<int>(
+      future: api.fetchMovimentacoesHoje(),
+      builder: (context, movSnapshot) {
+        int movimentacoes = 0;
+        if (movSnapshot.hasData) {
+          movimentacoes = movSnapshot.data!;
         }
-        return const SizedBox.shrink();
+        return GridView.count(
+          crossAxisCount: 3,
+          crossAxisSpacing: 15,
+          mainAxisSpacing: 15,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            _buildSummaryCard(
+              context,
+              title: 'Total em Estoque',
+              value: totalEmEstoque.toString(),
+              icon: Icons.inventory_2,
+              trend: '5.3% desde o mês passado',
+              iconBgColor: Colors.orange,
+            ),
+            _buildSummaryCard(
+              context,
+              title: 'Estoque Baixo',
+              value: estoqueBaixo.toString(),
+              icon: Icons.warning_amber,
+              trend: '3 itens a mais que ontem',
+              iconBgColor: Colors.red,
+            ),
+            _buildSummaryCard(
+              context,
+              title: 'Movimentações',
+              value: movimentacoes.toString(),
+              icon: Icons.swap_vert,
+              trend: 'Hoje',
+              iconBgColor: Colors.green,
+            ),
+          ],
+        );
       },
     );
   }
@@ -619,8 +780,17 @@ class MyHomePageState extends State<MyHomePage> {
               fillColor: Colors.white,
               contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 15),
             ),
-            onChanged: _onSearchChanged, // Usar o novo método com debounce
+            onChanged: _onSearchChanged,
           ),
+        ),
+        IconButton(
+          tooltip: 'Atualizar lista de produtos',
+          icon: const Icon(Icons.refresh, color: Colors.orange, size: 28),
+          onPressed: () async {
+            await _appState.carregarProdutosDaApi();
+            await _carregarCategorias();
+            setState(() {}); // Força rebuild dos Dropdowns
+          },
         ),
         const SizedBox(width: 15),
         Container(
@@ -637,15 +807,30 @@ class MyHomePageState extends State<MyHomePage> {
               ),
               contentPadding: const EdgeInsets.symmetric(horizontal: 15),
             ),
-            value: 'Todas as categorias',
-            items: const [
-              DropdownMenuItem(value: 'Todas as categorias', child: Text('Todas as categorias')),
-              // Adicionar categorias dinamicamente
-            ],
+            value: _categoriaFiltroSelecionada,
+            items: _categorias.map((c) => DropdownMenuItem(value: c.id, child: Text(c.nome))).toList(),
             onChanged: (value) {
-              // Lógica de filtro por categoria
+              setState(() {
+                _categoriaFiltroSelecionada = value;
+              });
             },
+            isExpanded: true,
+            disabledHint: const Text('Cadastre uma categoria primeiro'),
           ),
+        ),
+        const SizedBox(width: 10),
+        ElevatedButton.icon(
+          onPressed: _criarCategoria,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.grey[300],
+            foregroundColor: Colors.black87,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          icon: const Icon(Icons.category),
+          label: const Text('Nova Categoria'),
         ),
         const SizedBox(width: 15),
         ElevatedButton.icon(
@@ -666,6 +851,15 @@ class MyHomePageState extends State<MyHomePage> {
   }
 
   Widget _buildProductsTable() {
+    final appState = Provider.of<AppState>(context);
+    final produtos = appState.produtos;
+    // Filtra os produtos com base na busca e na categoria selecionada
+    final filteredProdutos = produtos.where((p) {
+      final buscaOk = _textController.text.isEmpty || p.nome.toLowerCase().contains(_textController.text.toLowerCase());
+      final categoriaOk = _categoriaFiltroSelecionada == null || p.categoriaId == _categoriaFiltroSelecionada;
+      return buscaOk && categoriaOk;
+    }).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -679,96 +873,70 @@ class MyHomePageState extends State<MyHomePage> {
           elevation: 3,
           child: Padding(
             padding: const EdgeInsets.all(15.0),
-            child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: fetchDados('produtos'),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(
-                    child: Text('Erro ao carregar produtos: ${snapshot.error}'),
-                  );
-                } else if (snapshot.hasData) {
-                  final produtos = snapshot.data?.map((json) => Produto.fromJson(json)).toList() ?? [];
-                  // Filtra os produtos com base na busca
-                  final filteredProdutos = produtos.where((p) {
-                    if (_textController.text.isEmpty) {
-                      return true;
-                    }
-                    return p.nome.toLowerCase().contains(_textController.text.toLowerCase());
-                  }).toList();
-
-                  if (filteredProdutos.isEmpty) {
-                    return const Center(child: Text('Nenhum produto encontrado.'));
-                  }
-
-                  // Cabeçalho da tabela
-                  final List<DataColumn> columns = [
-                    const DataColumn(label: Text('PRODUTO', style: TextStyle(fontWeight: FontWeight.bold))),
-                    const DataColumn(label: Text('CATEGORIA', style: TextStyle(fontWeight: FontWeight.bold))),
-                    const DataColumn(label: Text('QUANTIDADE', style: TextStyle(fontWeight: FontWeight.bold))),
-                    const DataColumn(label: Text('STATUS', style: TextStyle(fontWeight: FontWeight.bold))),
-                    const DataColumn(label: Text('AÇÕES', style: TextStyle(fontWeight: FontWeight.bold))),
-                  ];
-
-                  // Linhas da tabela
-                  final List<DataRow> rows = filteredProdutos.map((produto) {
-                    // Correção para RangeError: garante que o ID tenha pelo menos 8 caracteres
-                    String sku = produto.id.length >= 8 ? produto.id.substring(0, 8) : produto.id;
-
-                    return DataRow(cells: [
-                      DataCell(Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(produto.nome, style: const TextStyle(fontWeight: FontWeight.w600)),
-                          Text('SKU: $sku', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                        ],
-                      )),
-                      DataCell(Text(produto.condicao == 'novo' ? 'Eletrônicos' : 'Periféricos')),
-                      DataCell(Text(produto.quantidade.toString())),
-                      DataCell(_buildStatusChip(produto.quantidade)),
-                      DataCell(Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          TextButton(
-                            onPressed: () => _editarProduto(produto),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.blue,
-                            ),
-                            child: const Text('Editar'),
-                          ),
-                          TextButton(
-                            onPressed: () => _excluirProduto(produto.id),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.red,
-                            ),
-                            child: const Text('Excluir'),
-                          ),
-                        ],
-                      )),
-                    ]);
-                  }).toList();
-
-                  return SizedBox(
-                    width: double.infinity,
-                    child: DataTable(
-                      columns: columns,
-                      rows: rows,
-                      headingRowColor: MaterialStateProperty.all(Colors.grey[50]),
-                      dataRowColor: MaterialStateProperty.all(Colors.white),
-                      border: TableBorder.all(color: Colors.grey[200]!),
-                      columnSpacing: 30,
-                      horizontalMargin: 10,
-                      headingRowHeight: 50,
-                      dataRowHeight: 70,
-                      showCheckboxColumn: false,
-                    ),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
+            child: appState.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : filteredProdutos.isEmpty
+                    ? const Center(child: Text('Nenhum produto encontrado.'))
+                    : SizedBox(
+                        width: double.infinity,
+                        child: DataTable(
+                          columns: [
+                            const DataColumn(label: Text('PRODUTO', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('CATEGORIA', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('QUANTIDADE', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('STATUS', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('AÇÕES', style: TextStyle(fontWeight: FontWeight.bold))),
+                          ],
+                          rows: filteredProdutos.map((produto) {
+                            String sku = produto.id.length >= 8 ? produto.id.substring(0, 8) : produto.id;
+                            return DataRow(cells: [
+                              DataCell(Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(produto.nome, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  Text('SKU: $sku', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                ],
+                              )),
+                              DataCell(Text(
+                                (_categorias.firstWhere(
+                                  (c) => c.id == produto.categoriaId,
+                                  orElse: () => Categoria(id: '', nome: 'Sem categoria'),
+                                ).nome)
+                              )),
+                              DataCell(Text(produto.quantidade.toString())),
+                              DataCell(_buildStatusChip(produto.quantidade)),
+                              DataCell(Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  TextButton(
+                                    onPressed: () => _editarProduto(produto),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.blue,
+                                    ),
+                                    child: const Text('Editar'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => _excluirProduto(produto.id),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.red,
+                                    ),
+                                    child: const Text('Excluir'),
+                                  ),
+                                ],
+                              )),
+                            ]);
+                          }).toList(),
+                          headingRowColor: MaterialStateProperty.all(Colors.grey[50]),
+                          dataRowColor: MaterialStateProperty.all(Colors.white),
+                          border: TableBorder.all(color: Colors.grey[200]!),
+                          columnSpacing: 30,
+                          horizontalMargin: 10,
+                          headingRowHeight: 50,
+                          dataRowHeight: 70,
+                          showCheckboxColumn: false,
+                        ),
+                      ),
           ),
         ),
       ],
