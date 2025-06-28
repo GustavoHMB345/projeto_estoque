@@ -20,11 +20,11 @@ class Movimentacao {
 
   factory Movimentacao.fromJson(Map<String, dynamic> json) {
     return Movimentacao(
-      id: json['id'] ?? '',
-      produtoId: json['produto_id'] ?? json['productId'] ?? '', // Adapte se a API usar 'productId'
+      id: (json['id'] ?? '').toString(),
+      produtoId: (json['produto_id'] ?? json['productId'] ?? '').toString(), // Adapte se a API usar 'productId'
       tipo: json['tipo'] ?? '',
       quantidade: json['quantidade'] ?? 0,
-      usuarioId: json['usuario_id'] ?? json['userId'], // Adapte se a API usar 'userId'
+      usuarioId: (json['usuario_id'] ?? json['userId'])?.toString(), // Adapte se a API usar 'userId'
       dataHora: DateTime.parse(json['data_hora'] ?? json['timestamp']), // Adapte o nome do campo da API
       observacao: json['observacao'],
     );

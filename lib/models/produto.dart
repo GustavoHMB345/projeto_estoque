@@ -24,7 +24,7 @@ class Produto {
       condicao: json['condicao'] ?? '',
       quantidade: int.tryParse(json['quantidade'].toString()) ?? 0,
       criadoEm: DateTime.parse(json['data_criacao'] ?? DateTime.now().toIso8601String()),
-      categoriaId: json['categoria_id'],
+      categoriaId: json['categoria_id']?.toString(), // Garante que o categoria_id seja sempre uma String ou null
     );
   }
 

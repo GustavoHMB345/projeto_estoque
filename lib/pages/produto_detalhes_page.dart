@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../consumer_api.dart' as api; // ADICIONADO: Import da API
+import '../models/movimentacao.dart';
 import '../models/produto.dart';
+import 'package:intl/intl.dart';
 
 class ProdutoDetalhesPage extends StatefulWidget {
   final Produto produto;
@@ -19,26 +21,19 @@ class ProdutoDetalhesPage extends StatefulWidget {
 
 class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
   late Produto produto;
-  final List<String> _historico = [];
+  late Future<List<Movimentacao>> _movimentacoesFuture;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     produto = widget.produto;
-    // Simula um carregamento inicial de histórico se necessário
-    _adicionarAoHistorico("Visualização inicial do produto.");
+    _carregarMovimentacoes();
   }
 
-  void _adicionarAoHistorico(String acao) {
-    final agora = DateTime.now();
-    final dataHora = "${agora.day.toString().padLeft(2, '0')}/"
-        "${agora.month.toString().padLeft(2, '0')}/"
-        "${agora.year} - "
-        "${agora.hour.toString().padLeft(2, '0')}:"
-        "${agora.minute.toString().padLeft(2, '0')}";
+  void _carregarMovimentacoes() {
     setState(() {
-      _historico.insert(0, "$dataHora: $acao"); // Insere no início para ver os mais recentes primeiro
+      _movimentacoesFuture = api.fetchMovimentacoesPorProduto(produto.id);
     });
   }
 
@@ -113,7 +108,7 @@ class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
           setState(() {
             produto = atualizado;
           });
-          _adicionarAoHistorico("Produto editado: Nome: ${atualizado.nome}, Qtd: ${atualizado.quantidade}");
+          _carregarMovimentacoes();
 
           // Chama o callback para notificar a página anterior
           if (widget.onProdutoEditado != null) {
@@ -185,20 +180,46 @@ class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
                 const Text('Histórico de Movimentações:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const Divider(),
                 Expanded(
-                  child: _historico.isEmpty
-                      ? const Center(child: Text('Nenhum histórico disponível.'))
-                      : ListView.builder(
-                          itemCount: _historico.length,
-                          itemBuilder: (context, index) {
-                            return Card(
-                              margin: const EdgeInsets.symmetric(vertical: 4.0),
-                              child: ListTile(
-                                leading: const Icon(Icons.history),
-                                title: Text(_historico[index]),
-                              ),
-                            );
-                          },
-                        ),
+                  child: FutureBuilder<List<Movimentacao>>(
+                    future: _movimentacoesFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (snapshot.hasError) {
+                        return Center(child: Text('Erro ao carregar histórico: ${snapshot.error}'));
+                      }
+                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return const Center(child: Text('Nenhum histórico de movimentação encontrado.'));
+                      }
+
+                      final movimentacoes = snapshot.data!;
+                      return ListView.builder(
+                        itemCount: movimentacoes.length,
+                        itemBuilder: (context, index) {
+                          final mov = movimentacoes[index];
+                          final formattedDate = DateFormat('dd/MM/yyyy HH:mm').format(mov.dataHora.toLocal());
+                          final icon = mov.tipo == 'entrada'
+                              ? const Icon(Icons.arrow_downward, color: Colors.green)
+                              : mov.tipo == 'saida'
+                                  ? const Icon(Icons.arrow_upward, color: Colors.red)
+                                  : const Icon(Icons.edit, color: Colors.blue);
+                          final title = 'Tipo: ${mov.tipo[0].toUpperCase()}${mov.tipo.substring(1)} | Qtd: ${mov.quantidade}';
+                          final subtitle = '${mov.observacao ?? 'Sem observação.'}\nData: $formattedDate';
+
+                          return Card(
+                            margin: const EdgeInsets.symmetric(vertical: 4.0),
+                            child: ListTile(
+                              leading: icon,
+                              title: Text(title),
+                              subtitle: Text(subtitle),
+                              isThreeLine: true,
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
               ],
             ),

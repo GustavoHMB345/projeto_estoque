@@ -3,6 +3,7 @@ import 'package:logging/logging.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart'; 
+import 'models/movimentacao.dart';
 
 final Logger _logger = Logger('AuthManager');
 const String apiBaseUrl = 'http://192.168.2.115:3000';
@@ -105,6 +106,19 @@ Future<bool> deleteItem(String endpoint, String id) async {
   } else {
     // Opcional: lançar exceção para capturar no app
     throw Exception('Erro ao excluir: ${response.statusCode} ${response.body}');
+  }
+}
+
+Future<List<Movimentacao>> fetchMovimentacoesPorProduto(String produtoId) async {
+  final response = await http.get(
+    Uri.parse('$apiBaseUrl/movimentacoes/produto/$produtoId'),
+  );
+
+  if (response.statusCode == 200) {
+    final List<dynamic> jsonData = jsonDecode(response.body);
+    return jsonData.map((json) => Movimentacao.fromJson(json)).toList();
+  } else {
+    throw Exception('Falha ao carregar movimentações do produto');
   }
 }
 
