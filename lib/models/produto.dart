@@ -34,7 +34,7 @@ class Produto {
       'nome': nome,
       'condicao': condicao,
       'quantidade': quantidade,
-      'categoria_id': categoriaId,
+      'categoria_id': categoriaId, // Corrigido para usar o nome da nova coluna do banco
       if (includeDataCriacao) 'data_criacao': criadoEm.toIso8601String(),
     };
   }

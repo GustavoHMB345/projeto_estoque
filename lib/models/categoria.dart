@@ -6,7 +6,7 @@ class Categoria {
 
   factory Categoria.fromJson(Map<String, dynamic> json) {
     return Categoria(
-      id: json['id'] ?? '',
+      id: json['id'] != null ? json['id'].toString() : '',
       nome: json['nome'] ?? '',
     );
   }

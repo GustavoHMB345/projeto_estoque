@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
-import '../consumer_api.dart';
+import '../consumer_api.dart' as api; // ADICIONADO: Import da API
 import '../models/produto.dart';
 
 class ProdutoDetalhesPage extends StatefulWidget {
   final Produto produto;
-  final Future<void> Function(Produto)? onProdutoEditado;
+  // ADICIONADO: Callback para notificar a tela anterior sobre a edição
+  final Future<void> Function(Produto produtoEditado)? onProdutoEditado;
 
-  const ProdutoDetalhesPage({super.key, required this.produto, this.onProdutoEditado});
+  const ProdutoDetalhesPage({
+    super.key,
+    required this.produto,
+    this.onProdutoEditado,
+  });
 
   @override
   ProdutoDetalhesPageState createState() => ProdutoDetalhesPageState();
@@ -15,33 +20,14 @@ class ProdutoDetalhesPage extends StatefulWidget {
 class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
   late Produto produto;
   final List<String> _historico = [];
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     produto = widget.produto;
-    _carregarProdutoAtualizado();
-  }
-
-  Future<Produto> fetchProdutoAtualizado() async {
-    // Simulate fetching updated product details from the database
-    await Future.delayed(const Duration(milliseconds: 1));
-    return produto; // Replace with actual database fetch logic
-  }
-
-  void _carregarProdutoAtualizado() async {
-    try {
-      final produtoAtualizado = await fetchProdutoAtualizado();
-      if (!mounted) return;
-      setState(() {
-        produto = produtoAtualizado;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao carregar produto atualizado: $e')),
-      );
-    }
+    // Simula um carregamento inicial de histórico se necessário
+    _adicionarAoHistorico("Visualização inicial do produto.");
   }
 
   void _adicionarAoHistorico(String acao) {
@@ -49,10 +35,10 @@ class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
     final dataHora = "${agora.day.toString().padLeft(2, '0')}/"
         "${agora.month.toString().padLeft(2, '0')}/"
         "${agora.year} - "
-        "${agora.hour.toString().padLeft(2, '0')}: "
+        "${agora.hour.toString().padLeft(2, '0')}:"
         "${agora.minute.toString().padLeft(2, '0')}";
     setState(() {
-      _historico.add("$dataHora: $acao");
+      _historico.insert(0, "$dataHora: $acao"); // Insere no início para ver os mais recentes primeiro
     });
   }
 
@@ -60,9 +46,11 @@ class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
     final nomeController = TextEditingController(text: produto.nome);
     final quantidadeController = TextEditingController(text: produto.quantidade.toString());
     final condicaoController = TextEditingController(text: produto.condicao);
-    await showDialog(
+    final produtoAntigo = produto;
+
+    final bool? salvar = await showDialog<bool>(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Editar Produto'),
           content: SingleChildScrollView(
@@ -92,30 +80,63 @@ class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar', style: TextStyle(color: Color(0xFF007BFF))), // Cor do botão
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancelar'),
             ),
-            TextButton(
-              onPressed: () {
-                final atualizado = Produto(
-                  id: produto.id,
-                  nome: nomeController.text.trim(),
-                  condicao: condicaoController.text,
-                  quantidade: int.tryParse(quantidadeController.text.trim()) ?? 0,
-                  criadoEm: produto.criadoEm,
-                );
-                _adicionarAoHistorico("Produto editado: Nome: ${atualizado.nome}, Condição: ${atualizado.condicao}, Quantidade: ${atualizado.quantidade}");
-                setState(() {
-                  produto = atualizado;
-                });
-                Navigator.pop(context);
-              },
-              child: const Text('Salvar Alterações', style: TextStyle(color: Color(0xFF007BFF))), // Cor do botão
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Salvar Alterações'),
             ),
           ],
         );
       },
     );
+
+    if (salvar == true) {
+      setState(() => _isLoading = true);
+      try {
+        final atualizado = Produto(
+          id: produto.id,
+          nome: nomeController.text.trim(),
+          condicao: condicaoController.text,
+          quantidade: int.tryParse(quantidadeController.text.trim()) ?? 0,
+          criadoEm: produto.criadoEm,
+          categoriaId: produto.categoriaId,
+        );
+
+        // CORREÇÃO: Chamada à API para salvar as alterações
+        final success = await api.updateItem('produtos', produto.id, atualizado.toJson(includeDataCriacao: false));
+        
+        if (!mounted) return;
+
+        if (success) {
+          setState(() {
+            produto = atualizado;
+          });
+          _adicionarAoHistorico("Produto editado: Nome: ${atualizado.nome}, Qtd: ${atualizado.quantidade}");
+
+          // Chama o callback para notificar a página anterior
+          if (widget.onProdutoEditado != null) {
+            await widget.onProdutoEditado!(atualizado);
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Produto atualizado com sucesso!'), backgroundColor: Colors.green),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Falha ao atualizar o produto na API.'), backgroundColor: Colors.red),
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao salvar: $e'), backgroundColor: Colors.red),
+        );
+      } finally {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -123,8 +144,8 @@ class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(produto.nome, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF007BFF), // Cor azul vibrante
-        iconTheme: const IconThemeData(color: Colors.white), // Ícones brancos
+        backgroundColor: const Color(0xFF4F3C34),
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit, color: Colors.white),
@@ -132,62 +153,64 @@ class ProdutoDetalhesPageState extends State<ProdutoDetalhesPage> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            FutureBuilder<Produto>(
-              future: fetchProdutoAtualizado(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator(color: Color(0xFF007BFF)));
-                } else if (snapshot.hasError) {
-                  return Text('Erro ao carregar produto atualizado: ${snapshot.error}', style: const TextStyle(color: Colors.red));
-                } else if (snapshot.hasData) {
-                  final produtoAtualizado = snapshot.data!;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Nome: ${produtoAtualizado.nome}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF333333))),
-                      const SizedBox(height: 8),
-                      Text('Condição: ${produtoAtualizado.condicao}', style: const TextStyle(fontSize: 16, color: Color(0xFF555555))),
-                      const SizedBox(height: 4),
-                      Text('Quantidade: ${produtoAtualizado.quantidade}', style: const TextStyle(fontSize: 16, color: Color(0xFF555555))),
-                      const SizedBox(height: 4),
-                      Text('Criado em: ${produtoAtualizado.criadoEm.toLocal().day.toString().padLeft(2, '0')}-'
-                          '${produtoAtualizado.criadoEm.toLocal().month.toString().padLeft(2, '0')}-'
-                          '${produtoAtualizado.criadoEm.toLocal().year.toString().substring(2)}', style: const TextStyle(fontSize: 16, color: Color(0xFF555555))),
-                    ],
-                  );
-                } else {
-                  return const Text('Produto não encontrado', style: TextStyle(color: Colors.red));
-                }
-              },
-            ),
-            const SizedBox(height: 20),
-            const Text('Histórico de Edição e Movimentação:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF333333))),
-            const Divider(color: Color(0xFFDDDDDD)),
-            Expanded(
-              child: _historico.isEmpty
-                  ? const Center(child: Text('Nenhum histórico disponível.', style: TextStyle(color: Color(0xFF777777))))
-                  : ListView.builder(
-                itemCount: _historico.length,
-                itemBuilder: (context, index) {
-                  return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 4.0),
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Text(_historico[index], style: const TextStyle(fontSize: 14, color: Color(0xFF444444))),
+      body: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Detalhes do Produto', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: const Color(0xFF333333))),
+                const SizedBox(height: 16),
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Nome: ${produto.nome}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Text('Condição: ${produto.condicao}', style: const TextStyle(fontSize: 16)),
+                        const SizedBox(height: 4),
+                        Text('Quantidade: ${produto.quantidade}', style: const TextStyle(fontSize: 16)),
+                        const SizedBox(height: 4),
+                        Text('Criado em: ${produto.criadoEm.toLocal().toString().substring(0, 10)}', style: const TextStyle(fontSize: 16)),
+                      ],
                     ),
-                  );
-                },
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text('Histórico de Movimentações:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Divider(),
+                Expanded(
+                  child: _historico.isEmpty
+                      ? const Center(child: Text('Nenhum histórico disponível.'))
+                      : ListView.builder(
+                          itemCount: _historico.length,
+                          itemBuilder: (context, index) {
+                            return Card(
+                              margin: const EdgeInsets.symmetric(vertical: 4.0),
+                              child: ListTile(
+                                leading: const Icon(Icons.history),
+                                title: Text(_historico[index]),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: CircularProgressIndicator(),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }

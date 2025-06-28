@@ -27,7 +27,7 @@ class AuthModel with ChangeNotifier {
 
   Usuario? get usuario => _usuario;
 
-  void login(String username, String password) async {
+  Future<void> login(String username, String password) async {
     try {
       // Hash the password using SHA-256
       final bytes = utf8.encode(password);

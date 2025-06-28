@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart'; 
 
 final Logger _logger = Logger('AuthManager');
-const String apiBaseUrl = 'http://192.168.2.112:3000';
+const String apiBaseUrl = 'http://192.168.2.115:3000';
 
 class AuthManager {
   static final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
@@ -89,6 +89,7 @@ Future<bool> updateItem(String endpoint, String id, Map<String, dynamic> data) a
     headers: {'Content-Type': 'application/json'},
     body: jsonEncode(data),
   );
+  debugPrint('PUT $apiBaseUrl/$endpoint/$id => ${response.statusCode} ${response.body}');
   return response.statusCode == 200;
 }
 

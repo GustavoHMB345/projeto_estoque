@@ -25,7 +25,7 @@ class MyHomePageState extends State<MyHomePage> {
   Timer? _debounce;
 
   List<Categoria> _categorias = [];
-  bool _carregandoCategorias = false;
+  bool _carregandoCategorias = true;
   String? _categoriaFiltroSelecionada; // Agora começa como null
 
   @override
@@ -164,10 +164,12 @@ class MyHomePageState extends State<MyHomePage> {
                                 'data_hora': DateTime.now().toIso8601String(),
                                 'observacao': 'Produto adicionado ao estoque',
                               });
+                              // ATUALIZE AMBAS AS LISTAS
                               await _appState.carregarProdutosDaApi();
+                              await _carregarCategorias(); // <--- ADICIONADO
                             } else if (map['message'] != null) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Erro ao criar produto: \x1B[31m${map['message']}\x1B[0m')),
+                                SnackBar(content: Text('Erro ao criar produto: [31m${map['message']}[0m')),
                               );
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -175,11 +177,13 @@ class MyHomePageState extends State<MyHomePage> {
                               );
                             }
                           } else if (response == true) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Produto criado com sucesso!')),
-                            );
-                            Navigator.pop(context);
-                            await _appState.carregarProdutosDaApi();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Produto criado com sucesso!')),
+                              );
+                              Navigator.pop(context);
+                              // ATUALIZE AMBAS AS LISTAS AQUI TAMBÉM
+                              await _appState.carregarProdutosDaApi();
+                              await _carregarCategorias(); // <--- ADICIONADO
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Erro ao criar produto: Verifique os dados e tente novamente.')),
@@ -270,7 +274,7 @@ class MyHomePageState extends State<MyHomePage> {
                             condicao: condicaoController.text,
                             quantidade: novaQuantidade,
                             criadoEm: produto.criadoEm,
-                            categoriaId: categoriaSelecionada,
+                            categoriaId: categoriaSelecionada, // Corrigido: garantir que a categoria selecionada seja salva
                           );
                           final response = await api.updateItem('produtos', produto.id, atualizado.toJson(includeDataCriacao: false));
                           if (!mounted) return;
@@ -301,6 +305,7 @@ class MyHomePageState extends State<MyHomePage> {
                               'observacao': 'Detalhes do produto editados',
                             });
                             await _appState.carregarProdutosDaApi();
+                            await _carregarCategorias(); // Garante atualização da lista de categorias
                           } else {
                             _logger.severe('Erro ao atualizar o produto. Verifique os dados enviados e a conexão com a API.');
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -384,7 +389,7 @@ class MyHomePageState extends State<MyHomePage> {
     try {
       final dados = await api.fetchDados('categorias');
       final novasCategorias = dados.map<Categoria>((json) => Categoria.fromJson(json)).toList();
-      print('Categorias carregadas: \n' + novasCategorias.map((c) => 'id: \${c.id}, nome: \${c.nome}').join(', '));
+      print('Categorias carregadas: \n' + novasCategorias.map((c) => 'id: ${c.id}, nome: ${c.nome}').join(', '));
       setState(() {
         _categorias = novasCategorias;
         // Corrige o valor do filtro se a categoria selecionada não existir mais
@@ -481,6 +486,17 @@ class MyHomePageState extends State<MyHomePage> {
         );
       },
     );
+  }
+
+  // Função para filtrar produtos por nome e categoria
+  List<Produto> _filtrarProdutos(List<Produto> produtos) {
+    final busca = _textController.text.trim().toLowerCase();
+    final categoriaSelecionada = _categoriaFiltroSelecionada;
+    return produtos.where((p) {
+      final nomeOk = busca.isEmpty || p.nome.toLowerCase().contains(busca);
+      final categoriaOk = categoriaSelecionada == null || p.categoriaId == categoriaSelecionada;
+      return nomeOk && categoriaOk;
+    }).toList();
   }
 
   @override
@@ -690,7 +706,7 @@ class MyHomePageState extends State<MyHomePage> {
               title: 'Total em Estoque',
               value: totalEmEstoque.toString(),
               icon: Icons.inventory_2,
-              trend: '5.3% desde o mês passado',
+              trend: 'INSERIR OBSERVAÇÃO DEPOIS',
               iconBgColor: Colors.orange,
             ),
             _buildSummaryCard(
@@ -698,7 +714,7 @@ class MyHomePageState extends State<MyHomePage> {
               title: 'Estoque Baixo',
               value: estoqueBaixo.toString(),
               icon: Icons.warning_amber,
-              trend: '3 itens a mais que ontem',
+              trend: 'INSERIR OBSERVAÇÃO DEPOIS',
               iconBgColor: Colors.red,
             ),
             _buildSummaryCard(
@@ -706,7 +722,7 @@ class MyHomePageState extends State<MyHomePage> {
               title: 'Movimentações',
               value: movimentacoes.toString(),
               icon: Icons.swap_vert,
-              trend: 'Hoje',
+              trend: 'INSERIR OBSERVAÇÃO DEPOIS',
               iconBgColor: Colors.green,
             ),
           ],
@@ -808,7 +824,13 @@ class MyHomePageState extends State<MyHomePage> {
               contentPadding: const EdgeInsets.symmetric(horizontal: 15),
             ),
             value: _categoriaFiltroSelecionada,
-            items: _categorias.map((c) => DropdownMenuItem(value: c.id, child: Text(c.nome))).toList(),
+            items: [
+              const DropdownMenuItem<String>(
+                value: null,
+                child: Text('Sem filtro'),
+              ),
+              ..._categorias.map((c) => DropdownMenuItem(value: c.id, child: Text(c.nome)))
+            ],
             onChanged: (value) {
               setState(() {
                 _categoriaFiltroSelecionada = value;
@@ -853,12 +875,8 @@ class MyHomePageState extends State<MyHomePage> {
   Widget _buildProductsTable() {
     final appState = Provider.of<AppState>(context);
     final produtos = appState.produtos;
-    // Filtra os produtos com base na busca e na categoria selecionada
-    final filteredProdutos = produtos.where((p) {
-      final buscaOk = _textController.text.isEmpty || p.nome.toLowerCase().contains(_textController.text.toLowerCase());
-      final categoriaOk = _categoriaFiltroSelecionada == null || p.categoriaId == _categoriaFiltroSelecionada;
-      return buscaOk && categoriaOk;
-    }).toList();
+    // Usar a nova função de filtro combinada
+    final filteredProdutos = _filtrarProdutos(produtos);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -898,17 +916,48 @@ class MyHomePageState extends State<MyHomePage> {
                                   Text('SKU: $sku', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                                 ],
                               )),
-                              DataCell(Text(
-                                (_categorias.firstWhere(
-                                  (c) => c.id == produto.categoriaId,
-                                  orElse: () => Categoria(id: '', nome: 'Sem categoria'),
-                                ).nome)
-                              )),
+                              DataCell(
+                                Builder(
+                                  builder: (context) {
+                                    final catId = produto.categoriaId;
+                                    if (catId == null || catId.isEmpty) {
+                                      return const Text('Sem categoria', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey));
+                                    }
+                                    // Use a lista do provider, não a lista local _categorias
+                                    final cat = appState.categorias.firstWhere(
+                                      (c) => c.id == catId,
+                                      orElse: () => Categoria(id: '', nome: 'Carregando...'), // Fallback
+                                    );
+                                    if (cat.id.isEmpty) {
+                                      return Text('ID Inválido: [33m${catId.substring(0, 5)}...\u001b[0m', style: const TextStyle(color: Colors.orange));
+                                    }
+                                    return Text(cat.nome);
+                                  },
+                                ),
+                              ),
                               DataCell(Text(produto.quantidade.toString())),
                               DataCell(_buildStatusChip(produto.quantidade)),
                               DataCell(Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.visibility),
+                                    tooltip: 'Ver Detalhes',
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ProdutoDetalhesPage(
+                                            produto: produto,
+                                            onProdutoEditado: (produtoEditado) async {
+                                              await _appState.carregarProdutosDaApi();
+                                              await _carregarCategorias();
+                                            },
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
                                   TextButton(
                                     onPressed: () => _editarProduto(produto),
                                     style: TextButton.styleFrom(

@@ -6,12 +6,14 @@ class AuthPage extends StatelessWidget {
   final Function(BuildContext, AuthModel) onLogin;
   final TextEditingController usernameController;
   final TextEditingController passwordController;
+  final Widget? extraWidget;
 
   const AuthPage({
     super.key,
     required this.onLogin,
     required this.usernameController,
     required this.passwordController,
+    this.extraWidget,
   });
 
   @override
@@ -112,30 +114,47 @@ class AuthPage extends StatelessWidget {
     required BuildContext context,
     required AuthModel authModel,
   }) {
-    return ElevatedButton(
-      onPressed: () async {
-        await onLogin(context, authModel);
+    return Column(
+      children: [
+        ElevatedButton(
+          onPressed: () async {
+            await onLogin(context, authModel);
 
-        if (authModel.isAuthenticated) {
-          // Usuário autenticado com sucesso, sem mensagens adicionais
-        }
-      },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFFF9DC5C), // Cor amarela do site
-        foregroundColor: const Color(0xFF5D5D5D), // Cor do texto do botão
-        padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15), // Ajuste do padding do botão
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30.0), // Borda mais arredondada
+            if (authModel.isAuthenticated) {
+              // Usuário autenticado com sucesso, sem mensagens adicionais
+            } else {
+              // Exibe mensagem de erro se o login falhar
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Usuário ou senha inválidos!'),
+                  backgroundColor: Colors.red,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFF9DC5C), // Cor amarela do site
+            foregroundColor: const Color(0xFF5D5D5D), // Cor do texto do botão
+            padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15), // Ajuste do padding do botão
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30.0), // Borda mais arredondada
+            ),
+            elevation: 5, // Sombra para o botão
+          ),
+          child: const Text(
+            'ENTRAR', // Texto em maiúsculas
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
-        elevation: 5, // Sombra para o botão
-      ),
-      child: const Text(
-        'ENTRAR', // Texto em maiúsculas
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+        if (extraWidget != null) ...[
+          const SizedBox(height: 16),
+          extraWidget!,
+        ],
+      ],
     );
   }
 }
