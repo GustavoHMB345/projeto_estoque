@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'models/movimentacao.dart';
 
 final Logger _logger = Logger('AuthManager');
-const String apiBaseUrl = 'http://192.168.2.115:3000';
+const String apiBaseUrl = 'http://192.168.2.112:3000';
 
 class AuthManager {
   static final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();

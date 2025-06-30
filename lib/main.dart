@@ -99,16 +99,15 @@ class _ConnectionTestButtonState extends State<ConnectionTestButton> {
   Future<void> _testConnection() async {
     setState(() { _loading = true; _result = null; });
     try {
-      final response = await Uri.parse('http://192.168.2.115:3000/usuarios');
-      final res = await http.get(response);
-      if (res.statusCode == 200) {
-        final users = jsonDecode(res.body);
+      // CORREÇÃO: Testar a raiz da API para uma verificação mais genérica.
+      final response = await http.get(Uri.parse('http://192.168.2.112:3000'));
+      if (response.statusCode == 200) {
         setState(() {
-          _result = 'Conexão OK! Usuários cadastrados: \\${users.length}';
+          _result = 'Conexão com a API OK!';
         });
       } else {
         setState(() {
-          _result = 'Erro: status \\${res.statusCode}';
+          _result = 'Erro ao conectar na API: status ${response.statusCode}';
         });
       }
     } catch (e) {
